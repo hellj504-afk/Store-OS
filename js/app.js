@@ -4,7 +4,12 @@ let data=JSON.parse(localStorage.getItem('storeOS')||'{}');KEYS.forEach(k=>data[
 const save=()=>localStorage.setItem('storeOS',JSON.stringify(data));
 const money=n=>(Number(n)||0).toLocaleString(undefined,{maximumFractionDigits:2});
 const rateOf=code=>{const i=data.slow.find(x=>String(x.code).trim()===String(code).trim());return i?Number(i.rate)||0:0};
-const toast=m=>{const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600)};
+const toast=m=>{const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000)};
+const progress={wrap:document.getElementById('progressWrap'),bar:document.getElementById('progressBar'),text:document.getElementById('progressText'),percent:document.getElementById('progressPercent')};
+function showProgress(text){progress.wrap.classList.add('show');progress.bar.className='progress-bar';progress.bar.style.width='0%';progress.percent.textContent='0%';progress.text.textContent=text}
+function setProgress(text,pct){progress.text.textContent=text;progress.percent.textContent=Math.round(pct)+'%';progress.bar.style.width=pct+'%'}
+function doneProgress(text){progress.text.textContent=text;progress.percent.textContent='100%';progress.bar.style.width='100%';progress.bar.classList.add('done');setTimeout(()=>progress.wrap.classList.remove('show'),2200)}
+function failProgress(text){progress.text.textContent=text;progress.bar.style.width='100%';progress.bar.classList.add('error');setTimeout(()=>progress.wrap.classList.remove('show'),3500)}
 function render(){
  const invTotal=data.inventory.reduce((s,r)=>s+(Number(r.closing)||0)*rateOf(r.code),0);
  const storeTotal=data.store.reduce((s,r)=>s+(Number(r.closing)||0)*rateOf(r.code),0);
@@ -29,22 +34,21 @@ document.getElementById('modalCancel').onclick=()=>document.getElementById('moda
 document.getElementById('bomSearch').oninput=renderBom;
 function num(v){if(v==null)return 0;const s=String(v).replace(/,/g,'').replace(/[^0-9.\-]/g,'').trim();const n=parseFloat(s);return isNaN(n)?0:n}
 function clean(s){return String(s||'').replace(/\s+/g,' ').trim()}
-async function extractPdfRows(file){
- const buf=await file.arrayBuffer();const pdf=await pdfjsLib.getDocument({data:buf}).promise;const pages=[];
- for(let p=1;p<=pdf.numPages;p++){const page=await pdf.getPage(p);const tc=await page.getTextContent();const items=tc.items.map(i=>({text:clean(i.str),x:Math.round(i.transform[4]),y:Math.round(i.transform[5])})).filter(i=>i.text);
+async function extractPdfRows(file,kind){
+ const buf=await file.arrayBuffer();const pdf=await pdfjsLib.getDocument({data:buf}).promise;const total=pdf.numPages;const pages=[];
+ for(let p=1;p<=total;p++){setProgress('Reading '+file.name+' — page '+p+' of '+total,((p-1)/total)*90);const page=await pdf.getPage(p);const tc=await page.getTextContent();const items=tc.items.map(i=>({text:clean(i.str),x:Math.round(i.transform[4]),y:Math.round(i.transform[5])})).filter(i=>i.text);
   const rows=new Map();items.forEach(i=>{const y=Math.round(i.y/3)*3;if(!rows.has(y))rows.set(y,[]);rows.get(y).push(i)});
-  const arranged=[...rows.entries()].sort((a,b)=>b[0]-a[0]).map(([,cells])=>cells.sort((a,b)=>a.x-b.x));pages.push(...arranged)}
- return pages;
+  const arranged=[...rows.entries()].sort((a,b)=>b[0]-a[0]).map(([,cells])=>cells.sort((a,b)=>a.x-b.x));pages.push(...arranged);await new Promise(r=>setTimeout(r,10))}
+ setProgress('Extracting records...',92);return pages;
 }
 function headerMap(row,aliases){const map={};row.forEach((cell,i)=>{const t=cell.text.toLowerCase().replace(/[^a-z]/g,'');for(const[key,keys]of Object.entries(aliases)){if(keys.some(k=>t===k||t.includes(k)))map[key]=i}});return map}
 function cellAt(row,index){return index==null?'':clean((row[index]||{}).text)}
 function numberAt(row,index){return num(cellAt(row,index))}
 async function parseFile(file,kind){
  if(!file.name.toLowerCase().endsWith('.pdf')){
-  const wb=XLSX.read(await file.arrayBuffer());const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:'',raw:false});
-  return raw.map(r=>normalizeExcel(kind,r)).filter(r=>r.code||r.child);
+  showProgress('Reading Excel file...');setProgress('Reading Excel file...',45);const wb=XLSX.read(await file.arrayBuffer());const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:'',raw:false});setProgress('Extracting records...',90);return raw.map(r=>normalizeExcel(kind,r)).filter(r=>r.code||r.child);
  }
- const rows=await extractPdfRows(file);const out=[];let headers=null;
+ const rows=await extractPdfRows(file,kind);const out=[];let headers=null;
  const aliases={
   slow:{code:['itemcode'],desc:['itemdescription'],uom:['uom'],stock:['stock'],rate:['rate'],value:['value'],location:['location']},
   inventory:{sub:['subinventory'],code:['itemcode'],desc:['description'],uom:['uom'],opening:['opening'],closing:['closing']},
@@ -75,5 +79,5 @@ function normalizeExcel(kind,r){
  return{parent:clean(get('parent','fgcode','fg')),child:clean(get('childcode','itemcode','code')),desc:clean(get('description','desc')),qty:num(get('qty','quantity')),uom:clean(get('uom'))};
 }
 const fileMap={inventoryFile:'inventory',storeFile:'store',voucherFile:'voucher',irFile:'ir',bomFile:'bom',slowFile:'slow'};
-Object.entries(fileMap).forEach(([id,kind])=>{document.getElementById(id).onchange=async e=>{const f=e.target.files[0];if(!f)return;toast('Reading '+f.name+'...');try{const rows=await parseFile(f,kind);if(!rows.length)return toast('No rows detected');if(kind==='voucher'){rows.forEach(r=>{const inv=data.inventory.find(x=>x.code===r.code);if(inv)inv.closing=num(inv.closing)+r.demand;const st=data.store.find(x=>x.code===r.code);if(st)st.closing=num(st.closing)-r.demand})}data[kind]=data[kind].concat(rows);render();toast(rows.length+' records imported into '+kind.toUpperCase())}catch(err){toast('Import failed: '+err.message)}};e.target.value=''});
+Object.entries(fileMap).forEach(([id,kind])=>{document.getElementById(id).onchange=async e=>{const f=e.target.files[0];if(!f)return;showProgress('Starting import: '+f.name);try{const rows=await parseFile(f,kind);if(!rows.length){failProgress('No records detected in file');return}if(kind==='voucher'){rows.forEach(r=>{const inv=data.inventory.find(x=>x.code===r.code);if(inv)inv.closing=num(inv.closing)+r.demand;const st=data.store.find(x=>x.code===r.code);if(st)st.closing=num(st.closing)-r.demand})}setProgress('Saving records...',97);data[kind]=data[kind].concat(rows);render();doneProgress(rows.length+' records imported into '+kind.toUpperCase())}catch(err){failProgress('Import failed: '+err.message)}};e.target.value=''});
 render();

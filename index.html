@@ -6,6 +6,7 @@
 <title>Store OS — Inventory Management System</title>
 <meta name="description" content="Store OS — Inventory, Store, Vouchers, IR/Move Orders, BOM and Slow Moving cost management.">
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/progress.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -101,6 +102,11 @@
   <div class="glass panel"><div class="table-wrap"><table id="slowTable"></table></div></div>
 </section>
 </main>
+
+<div class="progress-wrap glass" id="progressWrap">
+  <div class="progress-head"><span id="progressText">Preparing upload...</span><span id="progressPercent">0%</span></div>
+  <div class="progress-track"><div class="progress-bar" id="progressBar"></div></div>
+</div>
 
 <div class="modal glass" id="modal">
   <div class="modal-box">
