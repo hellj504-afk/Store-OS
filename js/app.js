@@ -27,35 +27,53 @@ document.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>openModal(b.dat
 function openModal(type){const m=document.getElementById('modal');document.getElementById('modalTitle').textContent='Add '+type.toUpperCase()+' Item';document.getElementById('modalFields').innerHTML=FIELDS[type].map(([k,l])=>'<input class="input" id="f_'+k+'" placeholder="'+l+'">').join('');m.classList.add('open');document.getElementById('modalSave').onclick=()=>{const row={};FIELDS[type].forEach(([k])=>row[k]=document.getElementById('f_'+k).value);if(type==='slow'&&!row.rate)row.rate=0;if(type==='slow'&&!row.value)row.value=(Number(row.stock)||0)*(Number(row.rate)||0);data[type].push(row);save();render();m.classList.remove('open');toast('Item added')}}
 document.getElementById('modalCancel').onclick=()=>document.getElementById('modal').classList.remove('open');
 document.getElementById('bomSearch').oninput=renderBom;
-function num(v){const n=String(v||'').replace(/,/g,'').trim();const x=parseFloat(n);return isNaN(x)?0:x}
+function num(v){if(v==null)return 0;const s=String(v).replace(/,/g,'').replace(/[^0-9.\-]/g,'').trim();const n=parseFloat(s);return isNaN(n)?0:n}
+function clean(s){return String(s||'').replace(/\s+/g,' ').trim()}
+async function extractPdfRows(file){
+ const buf=await file.arrayBuffer();const pdf=await pdfjsLib.getDocument({data:buf}).promise;const pages=[];
+ for(let p=1;p<=pdf.numPages;p++){const page=await pdf.getPage(p);const tc=await page.getTextContent();const items=tc.items.map(i=>({text:clean(i.str),x:Math.round(i.transform[4]),y:Math.round(i.transform[5])})).filter(i=>i.text);
+  const rows=new Map();items.forEach(i=>{const y=Math.round(i.y/3)*3;if(!rows.has(y))rows.set(y,[]);rows.get(y).push(i)});
+  const arranged=[...rows.entries()].sort((a,b)=>b[0]-a[0]).map(([,cells])=>cells.sort((a,b)=>a.x-b.x));pages.push(...arranged)}
+ return pages;
+}
+function headerMap(row,aliases){const map={};row.forEach((cell,i)=>{const t=cell.text.toLowerCase().replace(/[^a-z]/g,'');for(const[key,keys]of Object.entries(aliases)){if(keys.some(k=>t===k||t.includes(k)))map[key]=i}});return map}
+function cellAt(row,index){return index==null?'':clean((row[index]||{}).text)}
+function numberAt(row,index){return num(cellAt(row,index))}
 async function parseFile(file,kind){
- if(file.name.toLowerCase().endsWith('.pdf')){
-  const buf=await file.arrayBuffer();const pdf=await pdfjsLib.getDocument({data:buf}).promise;let text='';
-  for(let p=1;p<=pdf.numPages;p++){const page=await pdf.getPage(p);const c=await page.getTextContent();text+=c.items.map(i=>i.str).join(' ')+'\n'}
-  return parseText(text,kind);
+ if(!file.name.toLowerCase().endsWith('.pdf')){
+  const wb=XLSX.read(await file.arrayBuffer());const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:'',raw:false});
+  return raw.map(r=>normalizeExcel(kind,r)).filter(r=>r.code||r.child);
  }
- const wb=XLSX.read(await file.arrayBuffer());const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
- return rows.map(r=>normalize(kind,r));
+ const rows=await extractPdfRows(file);const out=[];let headers=null;
+ const aliases={
+  slow:{code:['itemcode'],desc:['itemdescription'],uom:['uom'],stock:['stock'],rate:['rate'],value:['value'],location:['location']},
+  inventory:{sub:['subinventory'],code:['itemcode'],desc:['description'],uom:['uom'],opening:['opening'],closing:['closing']},
+  store:{sub:['subinventory'],code:['itemcode'],desc:['description'],uom:['uom'],opening:['opening'],closing:['closing']},
+  voucher:{code:['itemcode'],desc:['description'],locator:['destinationlocator'],demand:['demandqty'],balance:['balanceqty']},
+  ir:{code:['itemcode'],desc:['description'],locator:['destinationlocator'],fb:['fbnum','fbno'],serial:['serialnum','serialno'],reference:['reference'],demand:['demandqty'],balance:['balanceqty']},
+  bom:{parent:['parent','fgcode'],child:['childcode','itemcode'],desc:['description'],qty:['qty','quantity'],uom:['uom']}
+ };
+ for(const row of rows){
+  if(!headers){const hm=headerMap(row,aliases[kind]);if(Object.keys(hm).length>=3)headers=hm;continue}
+  const code=cellAt(row,headers.code).match(/\b(?:FG|RM|CM|SS|WIP|GI|SCR)\d{3,}-\d{3,}-\d{2}-\d{3}\b/i);
+  const itemCode=code?code[0]:cellAt(row,headers.code);
+  if(!itemCode||itemCode.toLowerCase().includes('itemcode'))continue;
+  if(kind==='slow'){out.push({code:itemCode,desc:cellAt(row,headers.desc),uom:cellAt(row,headers.uom),stock:numberAt(row,headers.stock),rate:numberAt(row,headers.rate),value:numberAt(row,headers.value),location:cellAt(row,headers.location)})}
+  else if(kind==='inventory'||kind==='store'){out.push({sub:cellAt(row,headers.sub),code:itemCode,desc:cellAt(row,headers.desc),uom:cellAt(row,headers.uom),opening:numberAt(row,headers.opening),closing:numberAt(row,headers.closing)})}
+  else if(kind==='voucher'){out.push({code:itemCode,desc:cellAt(row,headers.desc),locator:cellAt(row,headers.locator),demand:numberAt(row,headers.demand),balance:numberAt(row,headers.balance)})}
+  else if(kind==='ir'){out.push({code:itemCode,desc:cellAt(row,headers.desc),locator:cellAt(row,headers.locator),fb:cellAt(row,headers.fb),serial:cellAt(row,headers.serial),reference:cellAt(row,headers.reference),demand:numberAt(row,headers.demand),balance:numberAt(row,headers.balance)})}
+  else{out.push({parent:cellAt(row,headers.parent),child:itemCode,desc:cellAt(row,headers.desc),qty:numberAt(row,headers.qty),uom:cellAt(row,headers.uom)})}
+ }
+ const seen=new Set();return out.filter(r=>{const k=(r.code||r.child)+'|'+(r.desc||'');if(seen.has(k))return false;seen.add(k);return true});
 }
-function pick(row,names){for(const n of names){for(const k in row){if(k.toLowerCase().replace(/[^a-z]/g,'').includes(n))return row[k]}}return ''}
-function normalize(kind,r){
- if(kind==='inventory'||kind==='store')return{sub:pick(r,['subinventory','sub']),code:pick(r,['itemcode','code']),desc:pick(r,['description','desc']),uom:pick(r,['uom']),opening:num(pick(r,['opening'])),closing:num(pick(r,['closing']))};
- if(kind==='voucher')return{code:pick(r,['itemcode','code']),desc:pick(r,['description','desc']),locator:pick(r,['destination','locator']),demand:num(pick(r,['demand'])),balance:num(pick(r,['balance']))};
- if(kind==='ir')return{code:pick(r,['itemcode','code']),desc:pick(r,['description','desc']),locator:pick(r,['destination','locator']),fb:pick(r,['fb']),serial:pick(r,['serial']),reference:pick(r,['reference']),demand:num(pick(r,['demand'])),balance:num(pick(r,['balance']))};
- if(kind==='bom')return{parent:pick(r,['parent','fg']),child:pick(r,['child','itemcode','code']),desc:pick(r,['description','desc']),qty:num(pick(r,['qty','quantity'])),uom:pick(r,['uom'])};
- return{code:pick(r,['itemcode','code']),desc:pick(r,['description','desc']),uom:pick(r,['uom']),stock:num(pick(r,['stock','quantity'])),rate:num(pick(r,['rate','cost'])),value:num(pick(r,['value'])),location:pick(r,['location'])};
-}
-function parseText(text,kind){
- const lines=text.split('\n').map(l=>l.trim()).filter(Boolean);const out=[];
- const codeRe=/\b(?:FG|RM|CM|SS|WIP|GI|SCR)\d{3,}-\d{3,}-\d{2}-\d{3}\b/i;
- for(const line of lines){const m=line.match(codeRe);if(!m)continue;const code=m[0];const after=line.slice(line.indexOf(code)+code.length).trim();const nums=after.match(/[\d,]+\.?\d*/g)||[];
- if(kind==='inventory'||kind==='store'){out.push({sub:'',code,desc:after.replace(/[\d,]+\.?\d*/g,'').trim(),uom:'',opening:num(nums[0]),closing:num(nums[1]??nums[0])})}
- else if(kind==='voucher'){out.push({code,desc:after.replace(/[\d,]+\.?\d*/g,'').trim(),locator:'',demand:num(nums[0]),balance:num(nums[1]??nums[0])})}
- else if(kind==='ir'){out.push({code,desc:after.replace(/[\d,]+\.?\d*/g,'').trim(),locator:'',fb:'',serial:'',reference:'',demand:num(nums[0]),balance:num(nums[1]??nums[0])})}
- else if(kind==='bom'){out.push({parent:'',child:code,desc:after.replace(/[\d,]+\.?\d*/g,'').trim(),qty:num(nums[0]),uom:''})}
- else{const rate=nums.length>=2?num(nums[nums.length-2]):0;out.push({code,desc:after.replace(/[\d,]+\.?\d*/g,'').trim(),uom:'',stock:num(nums[0]),rate,value:num(nums[nums.length-1]),location:''})}}
- return out;
+function normalizeExcel(kind,r){
+ const get=(...names)=>{for(const n of names){for(const k in r){if(k.toLowerCase().replace(/[^a-z]/g,'').includes(n))return r[k]}}return ''};
+ if(kind==='slow')return{code:clean(get('itemcode','code')),desc:clean(get('itemdescription','description')),uom:clean(get('uom')),stock:num(get('stock','quantity')),rate:num(get('rate','cost')),value:num(get('value')),location:clean(get('location'))};
+ if(kind==='inventory'||kind==='store')return{sub:clean(get('subinventory','sub')),code:clean(get('itemcode','code')),desc:clean(get('description','desc')),uom:clean(get('uom')),opening:num(get('opening')),closing:num(get('closing'))};
+ if(kind==='voucher')return{code:clean(get('itemcode','code')),desc:clean(get('description','desc')),locator:clean(get('destinationlocator','locator')),demand:num(get('demandqty','demand')),balance:num(get('balanceqty','balance'))};
+ if(kind==='ir')return{code:clean(get('itemcode','code')),desc:clean(get('description','desc')),locator:clean(get('destinationlocator','locator')),fb:clean(get('fbnum','fbno','fb')),serial:clean(get('serialnum','serialno','serial')),reference:clean(get('reference')),demand:num(get('demandqty','demand')),balance:num(get('balanceqty','balance'))};
+ return{parent:clean(get('parent','fgcode','fg')),child:clean(get('childcode','itemcode','code')),desc:clean(get('description','desc')),qty:num(get('qty','quantity')),uom:clean(get('uom'))};
 }
 const fileMap={inventoryFile:'inventory',storeFile:'store',voucherFile:'voucher',irFile:'ir',bomFile:'bom',slowFile:'slow'};
-Object.entries(fileMap).forEach(([id,kind])=>{document.getElementById(id).onchange=async e=>{const f=e.target.files[0];if(!f)return;toast('Reading '+f.name+'...');try{const rows=await parseFile(f,kind);if(!rows.length)return toast('No rows detected');if(kind==='voucher'){rows.forEach(r=>{const inv=data.inventory.find(x=>x.code===r.code);if(inv)inv.closing=num(inv.closing)+r.demand;const st=data.store.find(x=>x.code===r.code);if(st)st.closing=num(st.closing)-r.demand})}data[kind]=data[kind].concat(rows);render();toast(rows.length+' records imported')}catch(err){toast('Import failed')}};e.target.value=''});
+Object.entries(fileMap).forEach(([id,kind])=>{document.getElementById(id).onchange=async e=>{const f=e.target.files[0];if(!f)return;toast('Reading '+f.name+'...');try{const rows=await parseFile(f,kind);if(!rows.length)return toast('No rows detected');if(kind==='voucher'){rows.forEach(r=>{const inv=data.inventory.find(x=>x.code===r.code);if(inv)inv.closing=num(inv.closing)+r.demand;const st=data.store.find(x=>x.code===r.code);if(st)st.closing=num(st.closing)-r.demand})}data[kind]=data[kind].concat(rows);render();toast(rows.length+' records imported into '+kind.toUpperCase())}catch(err){toast('Import failed: '+err.message)}};e.target.value=''});
 render();
