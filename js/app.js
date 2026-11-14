@@ -155,11 +155,17 @@ async function parseFile(file,kind){
     if(previousPageLast&&part.text.length<=12)previousPageLast.desc=fixDescription((previousPageLast.desc||'')+' '+part.text);
     continue;
    }
-   // If this page has item records, keep every continuation on this page.
-   // Only carry a short continuation to the previous page when this page has no records.
-   let nearest=records[0],distance=Math.abs(part.y-nearest._anchorY);
-   for(let i=1;i<records.length;i++){const d=Math.abs(part.y-records[i]._anchorY);if(d<distance){nearest=records[i];distance=d}}
-   nearest._descParts.push(part);
+   // A wrapped description belongs to the closest item row ABOVE it,
+   // not whichever row happens to be nearest (which may be the next item).
+   const above=records.filter(record=>record._anchorY>=part.y)
+     .sort((a,b)=>(a._anchorY-part.y)-(b._anchorY-part.y));
+   if(above.length){
+    above[0]._descParts.push(part);
+   }else if(previousPageLast&&part.text.length<=12){
+    previousPageLast.desc=fixDescription((previousPageLast.desc||'')+' '+part.text);
+   }else{
+    records[0]._descParts.push(part);
+   }
   }
   records.forEach(record=>{
    record._descParts.sort((a,b)=>b.y-a.y);
