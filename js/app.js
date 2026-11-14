@@ -65,8 +65,11 @@ async function extractPdfRows(file,kind){
   try{page=await pdf.getPage(p);tc=await page.getTextContent()}catch(e){throw new Error('PDF page '+p+' could not be read: '+(e.message||e))}
   const rawItems=tc&&Array.isArray(tc.items)?tc.items:[];
   const items=rawItems.filter(i=>i&&typeof i.str==='string'&&i.str.trim()&&i.transform).map(i=>({text:clean(i.str),x:Math.round(i.transform?.[4]||0),y:Math.round(i.transform?.[5]||0)})).filter(i=>i.text&&!isHeaderNoise(i.text));
-  const rows=new Map();items.forEach(i=>{const y=Math.round(i.y/3)*3;if(!rows.has(y))rows.set(y,[]);rows.get(y).push(i)});
-  const arranged=[...rows.entries()].sort((a,b)=>b[0]-a[0]).map(([,cells])=>cells.sort((a,b)=>a.x-b.x));pages.push(...arranged);await new Promise(r=>setTimeout(r,10))
+  items.sort((a,b)=>b.y-a.y||a.x-b.x);
+  const rows=[];let current=[];let currentY=null;
+  items.forEach(item=>{if(currentY===null||Math.abs(item.y-currentY)<=4){current.push(item);currentY=currentY===null?item.y:currentY}else{rows.push(current.sort((a,b)=>a.x-b.x));current=[item];currentY=item.y}});
+  if(current.length)rows.push(current.sort((a,b)=>a.x-b.x));
+  pages.push(...rows);await new Promise(r=>setTimeout(r,10))
  }
  setProgress(kind,'Extracting records...',92);return pages;
 }
@@ -79,9 +82,10 @@ function makeColumnMap(header,aliases){
 function columnValue(row,ranges,key){if(!ranges||!ranges[key])return '';let text='';(row||[]).forEach(cell=>{if(cell&&cell.x>=ranges[key].start&&cell.x<ranges[key].end)text+=' '+cell.text});return clean(text)}
 function columnNumber(row,ranges,key){return num(columnValue(row,ranges,key))}
 function rowText(row){return clean((row||[]).map(c=>c&&c.text?c.text:'').join(' '))}
-function fullDescription(row,itemCode){
+function fullDescription(row,itemCode,kind){
  const text=rowText(row);const codeIndex=text.toLowerCase().indexOf(String(itemCode||'').toLowerCase());if(codeIndex<0)return '';
  let after=text.slice(codeIndex+String(itemCode).length);
+ if(kind==='slow')after=after.replace(/^\s*[A-Z0-9]{2,10}\s+/i,'');
  const uom=after.match(/\b(?:NOS|NOS\.|PCS|KGS|KG|MTR|MTRS|LTR|LTRS|SET|SETS|PAD|GLN)\b/i);
  if(uom&&uom.index>=0)after=after.slice(0,uom.index);
  return clean(after.replace(/^[-\s]+/,''));
@@ -114,15 +118,16 @@ async function parseFile(file,kind){
    if(continuation&&out.length){const last=out[out.length-1];last.desc=clean((last.desc||'')+' '+continuation)}
    continue;
   }
-  const fullDesc=fullDescription(row,itemCode);
+  const columnDesc=fixDescription(columnValue(row,ranges,'desc'));
+  const fullDesc=fullDescription(row,itemCode,kind);
+  const desc=columnDesc||fullDesc;
   if(kind==='inventory'||kind==='store'){
-   let desc=fullDesc||fixDescription(columnValue(row,ranges,'desc'));const uom=columnValue(row,ranges,'uom');
-   if(!uom&&UOM_RE.test(desc)){const m=desc.match(UOM_RE);desc=clean(desc.replace(m[0],''))}
+   const uom=columnValue(row,ranges,'uom');
    out.push({sub:columnValue(row,ranges,'sub').replace(/^'/,''),locator:columnValue(row,ranges,'locator'),code:itemCode,desc,uom:uom||'NOS',opening:columnNumber(row,ranges,'opening'),received:columnNumber(row,ranges,'received'),issued:columnNumber(row,ranges,'issued'),closing:columnNumber(row,ranges,'closing')})
-  }else if(kind==='slow'){const stock=columnNumber(row,ranges,'stock');const rate=columnNumber(row,ranges,'rate');const pdfValue=columnNumber(row,ranges,'value');out.push({code:itemCode,desc:fullDesc||fixDescription(columnValue(row,ranges,'desc')),uom:columnValue(row,ranges,'uom'),stock,rate,value:pdfValue>0?pdfValue:stock*rate,location:columnValue(row,ranges,'location')})}
-  else if(kind==='voucher'){out.push({code:itemCode,desc:fullDesc||fixDescription(columnValue(row,ranges,'desc')),locator:columnValue(row,ranges,'locator'),demand:columnNumber(row,ranges,'demand'),balance:columnNumber(row,ranges,'balance')})}
-  else if(kind==='ir'){out.push({code:itemCode,desc:fullDesc||fixDescription(columnValue(row,ranges,'desc')),locator:columnValue(row,ranges,'locator'),fb:columnValue(row,ranges,'fb'),serial:columnValue(row,ranges,'serial'),reference:columnValue(row,ranges,'reference'),demand:columnNumber(row,ranges,'demand'),balance:columnNumber(row,ranges,'balance')})}
-  else{out.push({parent:columnValue(row,ranges,'parent'),child:itemCode,desc:fullDesc||fixDescription(columnValue(row,ranges,'desc')),qty:columnNumber(row,ranges,'qty'),uom:columnValue(row,ranges,'uom')})}
+  }else if(kind==='slow'){const stock=columnNumber(row,ranges,'stock');const rate=columnNumber(row,ranges,'rate');const pdfValue=columnNumber(row,ranges,'value');out.push({code:itemCode,desc,uom:columnValue(row,ranges,'uom'),stock,rate,value:pdfValue>0?pdfValue:stock*rate,location:columnValue(row,ranges,'location')})}
+  else if(kind==='voucher'){out.push({code:itemCode,desc,locator:columnValue(row,ranges,'locator'),demand:columnNumber(row,ranges,'demand'),balance:columnNumber(row,ranges,'balance')})}
+  else if(kind==='ir'){out.push({code:itemCode,desc,locator:columnValue(row,ranges,'locator'),fb:columnValue(row,ranges,'fb'),serial:columnValue(row,ranges,'serial'),reference:columnValue(row,ranges,'reference'),demand:columnNumber(row,ranges,'demand'),balance:columnNumber(row,ranges,'balance')})}
+  else{out.push({parent:columnValue(row,ranges,'parent'),child:itemCode,desc,qty:columnNumber(row,ranges,'qty'),uom:columnValue(row,ranges,'uom')})}
  }
  if(!ranges)throw new Error('PDF header/columns not recognized. Please upload the standard Inventory/Store PDF.');
  const seen=new Set();return out.filter(r=>{const k=(r.code||r.child||'')+'|'+(r.locator||'')+'|'+(r.sub||'');if(seen.has(k))return false;seen.add(k);return true});
