@@ -5,12 +5,12 @@ let firebaseApi=null,saving=false;
 if(typeof pdfjsLib!=='undefined'){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'}
 const money=n=>(Number(n)||0).toLocaleString(undefined,{maximumFractionDigits:2});
 const rateOf=code=>{const i=data.slow.find(x=>String(x.code||'').trim()===String(code||'').trim());return i?Number(i.rate)||0:0};
-const toast=m=>{const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000)};
+const toast=m=>{const t=document.getElementById('toast');if(!t)return;t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000)};
 function buttonProgress(kind,text,pct){const el=document.getElementById(kind+'Progress');if(el)el.textContent=text?pct+'%':''}
 function showProgress(kind,text){buttonProgress(kind,text,1)}
 function setProgress(kind,text,pct){buttonProgress(kind,text,pct)}
 function doneProgress(kind,text){buttonProgress(kind,text,100);setTimeout(()=>buttonProgress(kind,'',0),2500)}
-function failProgress(kind,text){buttonProgress(kind,'Error',100);toast(text);setTimeout(()=>buttonProgress(kind,'',0),4000)}
+function failProgress(kind,text){buttonProgress(kind,'Error',100);toast(text);setTimeout(()=>buttonProgress(kind,'',0),6000)}
 async function initFirebase(){
  try{
   const [{initializeApp},{getFirestore,doc,getDoc,setDoc}]=await Promise.all([import('https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js'),import('https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js')]);
@@ -25,9 +25,8 @@ async function save(){localStorage.setItem('storeOS',JSON.stringify(data));if(!f
 function render(){
  const invTotal=data.inventory.reduce((s,r)=>s+(Number(r.closing)||0)*rateOf(r.code),0);
  const storeTotal=data.store.reduce((s,r)=>s+(Number(r.closing)||0)*rateOf(r.code),0);
- document.getElementById('invTotal').textContent=money(invTotal);
- document.getElementById('storeTotal').textContent=money(storeTotal);
- document.getElementById('itemTotal').textContent=data.inventory.length+data.store.length;
+ const invTotalEl=document.getElementById('invTotal');const storeTotalEl=document.getElementById('storeTotal');const itemTotalEl=document.getElementById('itemTotal');
+ if(invTotalEl)invTotalEl.textContent=money(invTotal);if(storeTotalEl)storeTotalEl.textContent=money(storeTotal);if(itemTotalEl)itemTotalEl.textContent=data.inventory.length+data.store.length;
  drawChart(invTotal,storeTotal);
  table('inventoryTable',['Sub Inventory','Locator','Item Code','Description','UOM','Opening','Received','Issued','Closing','Rate','Cost'],data.inventory.map(r=>[r.sub,r.locator,r.code,r.desc,r.uom,r.opening,r.received,r.issued,r.closing,money(rateOf(r.code)),money((Number(r.closing)||0)*rateOf(r.code))]));
  table('storeTable',['Sub Inventory','Locator','Item Code','Description','UOM','Opening','Received','Issued','Closing','Rate','Cost'],data.store.map(r=>[r.sub,r.locator,r.code,r.desc,r.uom,r.opening,r.received,r.issued,r.closing,money(rateOf(r.code)),money((Number(r.closing)||0)*rateOf(r.code))]));
@@ -35,38 +34,40 @@ function render(){
  table('irTable',['Item Code','Description','Destination Locator','F.B No.','Serial No.','Reference','Demand Qty','Balance Qty'],data.ir.map(r=>[r.code,r.desc,r.locator,r.fb,r.serial,r.reference,r.demand,r.balance]));
  renderBom();table('slowTable',['Item Code','Description','UOM','Stock','Rate','Value','Location'],data.slow.map(r=>[r.code,r.desc,r.uom,r.stock,money(r.rate),money(r.value),r.location]));save();
 }
-function table(id,heads,rows){const el=document.getElementById(id);el.innerHTML='<thead><tr>'+heads.map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+(rows.length?rows.map(r=>'<tr>'+r.map(c=>'<td>'+(c??'')+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="'+heads.length+'" style="color:#9aa7c7">No records</td></tr>')+'</tbody>'}
-function renderBom(){const q=String(document.getElementById('bomSearch').value||'').toLowerCase();const rows=data.bom.filter(r=>{const parent=String(r.parent||'').toLowerCase();const child=String(r.child||'').toLowerCase();const desc=String(r.desc||'').toLowerCase();return !q||parent.includes(q)||child.includes(q)||desc.includes(q)});table('bomTable',['Parent / FG','Child Item','Description','Qty','UOM','Rate','Line Cost'],rows.map(r=>{const c=(Number(r.qty)||0)*rateOf(r.child);return[r.parent,r.child,r.desc,r.qty,r.uom,money(rateOf(r.child)),money(c)]}));document.getElementById('bomCost').textContent=money(rows.reduce((s,r)=>s+(Number(r.qty)||0)*rateOf(r.child),0))}
-function drawChart(a,b){const c=document.getElementById('chart'),x=c.getContext('2d');c.width=c.offsetWidth*2;c.height=440;x.scale(2,2);const w=c.offsetWidth,h=220,max=Math.max(a,b,1);x.clearRect(0,0,w,h);[[a,'#4f8cff','Inventory'],[b,'#22d3ee','Store']].forEach((d,i)=>{const bw=110,bx=80+i*220,bh=(d[0]/max)*150;x.fillStyle='rgba(255,255,255,.08)';x.fillRect(bx,40,bw,150);const g=x.createLinearGradient(0,40,0,190);g.addColorStop(0,d[1]);g.addColorStop(1,'rgba(255,255,255,.05)');x.fillStyle=g;x.fillRect(bx,190-bh,bw,bh);x.fillStyle='#fff';x.font='bold 15px Inter';x.fillText(money(d[0]),bx,30);x.fillStyle='#9aa7c7';x.font='12px Inter';x.fillText(d[2],bx,208)})}
+function table(id,heads,rows){const el=document.getElementById(id);if(!el)return;el.innerHTML='<thead><tr>'+heads.map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+(rows.length?rows.map(r=>'<tr>'+r.map(c=>'<td>'+(c??'')+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="'+heads.length+'" style="color:#9aa7c7">No records</td></tr>')+'</tbody>'}
+function renderBom(){const search=document.getElementById('bomSearch');const cost=document.getElementById('bomCost');if(!search||!cost)return;const q=String(search.value||'').toLowerCase();const rows=data.bom.filter(r=>{const parent=String(r.parent||'').toLowerCase();const child=String(r.child||'').toLowerCase();const desc=String(r.desc||'').toLowerCase();return !q||parent.includes(q)||child.includes(q)||desc.includes(q)});table('bomTable',['Parent / FG','Child Item','Description','Qty','UOM','Rate','Line Cost'],rows.map(r=>{const c=(Number(r.qty)||0)*rateOf(r.child);return[r.parent,r.child,r.desc,r.qty,r.uom,money(rateOf(r.child)),money(c)]}));cost.textContent=money(rows.reduce((s,r)=>s+(Number(r.qty)||0)*rateOf(r.child),0))}
+function drawChart(a,b){const c=document.getElementById('chart');if(!c||!c.getContext)return;const x=c.getContext('2d');if(!x)return;c.width=c.offsetWidth*2;c.height=440;x.scale(2,2);const w=c.offsetWidth,h=220,max=Math.max(a,b,1);x.clearRect(0,0,w,h);[[a,'#4f8cff','Inventory'],[b,'#22d3ee','Store']].forEach((d,i)=>{const bw=110,bx=80+i*220,bh=(d[0]/max)*150;x.fillStyle='rgba(255,255,255,.08)';x.fillRect(bx,40,bw,150);const g=x.createLinearGradient(0,40,0,190);g.addColorStop(0,d[1]);g.addColorStop(1,'rgba(255,255,255,.05)');x.fillStyle=g;x.fillRect(bx,190-bh,bw,bh);x.fillStyle='#fff';x.font='bold 15px Inter';x.fillText(money(d[0]),bx,30);x.fillStyle='#9aa7c7';x.font='12px Inter';x.fillText(d[2],bx,208)})}
 document.querySelectorAll('[data-clear]').forEach(b=>b.onclick=async()=>{if(confirm('Clear all '+b.dataset.clear+' records?')){data[b.dataset.clear]=[];await save();render();toast('Cleared')}});
 document.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>openModal(b.dataset.add));
-function openModal(type){const m=document.getElementById('modal');document.getElementById('modalTitle').textContent='Add '+type.toUpperCase()+' Item';document.getElementById('modalFields').innerHTML=FIELDS[type].map(([k,l])=>'<input class="input" id="f_'+k+'" placeholder="'+l+'">').join('');m.classList.add('open');document.getElementById('modalSave').onclick=async()=>{const row={};FIELDS[type].forEach(([k])=>row[k]=document.getElementById('f_'+k).value);if(type==='slow'&&!row.rate)row.rate=0;if(type==='slow'&&!row.value)row.value=(Number(row.stock)||0)*(Number(row.rate)||0);data[type].push(row);await save();render();m.classList.remove('open');toast('Item added')}}
-document.getElementById('modalCancel').onclick=()=>document.getElementById('modal').classList.remove('open');
-document.getElementById('bomSearch').oninput=renderBom;
+function openModal(type){const m=document.getElementById('modal');if(!m)return;document.getElementById('modalTitle').textContent='Add '+type.toUpperCase()+' Item';document.getElementById('modalFields').innerHTML=FIELDS[type].map(([k,l])=>'<input class="input" id="f_'+k+'" placeholder="'+l+'">').join('');m.classList.add('open');document.getElementById('modalSave').onclick=async()=>{const row={};FIELDS[type].forEach(([k])=>{const input=document.getElementById('f_'+k);row[k]=input?input.value:''});if(type==='slow'&&!row.rate)row.rate=0;if(type==='slow'&&!row.value)row.value=(Number(row.stock)||0)*(Number(row.rate)||0);data[type].push(row);await save();render();m.classList.remove('open');toast('Item added')}}
+const modalCancel=document.getElementById('modalCancel');if(modalCancel)modalCancel.onclick=()=>document.getElementById('modal').classList.remove('open');
+const bomSearch=document.getElementById('bomSearch');if(bomSearch)bomSearch.oninput=renderBom;
 function num(v){if(v==null)return 0;const s=String(v).replace(/,/g,'').replace(/[^0-9.\-]/g,'').trim();const n=parseFloat(s);return isNaN(n)?0:n}
 function clean(s){return String(s||'').replace(/\s+/g,' ').trim()}
 function isHeaderNoise(text){const t=text.toLowerCase();return t.includes('pak elektron')||t.includes('slow moving inventory status')||t.includes('subinventory / locator wise')||t.includes('unit 2 itr')||t.includes('from locator')||t.includes('to locator')||t.includes('from date')||t.includes('to date')||t.includes('subinventory:')||t.includes('printed by')||t.includes('page ')||t.includes('inv. group')||t.includes('aging:')}
 async function extractPdfRows(file,kind){
- if(typeof pdfjsLib==='undefined')throw new Error('PDF reader not loaded. Internet/ad-blocker check karein.');
- const buf=await file.arrayBuffer();const pdf=await pdfjsLib.getDocument({data:buf}).promise;const total=pdf.numPages;const pages=[];
- for(let p=1;p<=total;p++){setProgress(kind,'Reading page '+p+' of '+total,Math.round(((p-1)/total)*90));const page=await pdf.getPage(p);const tc=await page.getTextContent();const items=tc.items.map(i=>({text:clean(i.str),x:Math.round(i.transform[4]),y:Math.round(i.transform[5])})).filter(i=>i.text&&!isHeaderNoise(i.text));
+ if(typeof pdfjsLib==='undefined'||!pdfjsLib)throw new Error('PDF reader library not loaded. Internet/ad-blocker check karein.');
+ const buf=await file.arrayBuffer();const pdf=await pdfjsLib.getDocument({data:buf}).promise;if(!pdf)throw new Error('PDF could not be opened');const total=pdf.numPages;const pages=[];
+ for(let p=1;p<=total;p++){setProgress(kind,'Reading page '+p+' of '+total,Math.round(((p-1)/total)*90));const page=await pdf.getPage(p);const tc=await page.getTextContent();const items=(tc&&tc.items?tc.items:[]).map(i=>({text:clean(i.str),x:Math.round(i.transform[4]),y:Math.round(i.transform[5])})).filter(i=>i.text&&!isHeaderNoise(i.text));
   const rows=new Map();items.forEach(i=>{const y=Math.round(i.y/3)*3;if(!rows.has(y))rows.set(y,[]);rows.get(y).push(i)});
   const arranged=[...rows.entries()].sort((a,b)=>b[0]-a[0]).map(([,cells])=>cells.sort((a,b)=>a.x-b.x));pages.push(...arranged);await new Promise(r=>setTimeout(r,10))}
  setProgress(kind,'Extracting records...',92);return pages;
 }
 function makeColumnMap(header,aliases){
- const cols={};header.forEach((cell,i)=>{const t=cell.text.toLowerCase().replace(/[^a-z]/g,'');for(const[key,keys]of Object.entries(aliases)){if(!cols[key]&&keys.some(k=>t===k||t.includes(k)))cols[key]={index:i,x:cell.x}}});
+ const cols={};(header||[]).forEach((cell,i)=>{if(!cell)return;const t=cell.text.toLowerCase().replace(/[^a-z]/g,'');for(const[key,keys]of Object.entries(aliases)){if(!cols[key]&&keys.some(k=>t===k||t.includes(k)))cols[key]={index:i,x:cell.x}}});
  const entries=Object.entries(cols).sort((a,b)=>a[1].x-b[1].x);const ranges={};
  entries.forEach(([key,cell],i)=>{const next=entries[i+1];ranges[key]={start:cell.x-8,end:next?next[1].x-8:99999}});
  return ranges;
 }
-function columnValue(row,ranges,key){const range=ranges[key];if(!range)return '';let text='';row.forEach(cell=>{if(cell.x>=range.start&&cell.x<range.end)text+=' '+cell.text});return clean(text)}
+function columnValue(row,ranges,key){const range=ranges[key];if(!range)return '';let text='';(row||[]).forEach(cell=>{if(cell&&cell.x>=range.start&&cell.x<range.end)text+=' '+cell.text});return clean(text)}
 function columnNumber(row,ranges,key){return num(columnValue(row,ranges,key))}
 const CODE_RE=/\b(?:FG|RM|CM|SS|WIP|GI|SCR)\d{2,5}(?:-\d+)*-\d{2}-\d{3}\b/i;
 const UOM_RE=/^\s*(?:NOS|NOS\.|PCS|KGS|KG|MTR|MTRS|LTR|LTRS|SET|SETS|PAD|GLN)\s*$/i;
 async function parseFile(file,kind){
+ if(!file)throw new Error('No file selected');
  if(!file.name.toLowerCase().endsWith('.pdf')){
-  showProgress(kind,'Reading Excel...');setProgress(kind,'Reading Excel...',45);const wb=XLSX.read(await file.arrayBuffer());const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:'',raw:false});setProgress(kind,'Extracting...',90);return raw.map(r=>normalizeExcel(kind,r)).filter(r=>r.code||r.child);
+  if(typeof XLSX==='undefined'||!XLSX)throw new Error('Excel reader library not loaded. Internet/ad-blocker check karein.');
+  showProgress(kind,'Reading Excel...');setProgress(kind,'Reading Excel...',45);const wb=XLSX.read(await file.arrayBuffer());const sheetName=wb&&wb.SheetNames&&wb.SheetNames[0];const sheet=sheetName?wb.Sheets[sheetName]:null;if(!sheet)throw new Error('Excel file has no readable sheet');const raw=XLSX.utils.sheet_to_json(sheet,{defval:'',raw:false});setProgress(kind,'Extracting...',90);return raw.map(r=>normalizeExcel(kind,r)).filter(r=>r.code||r.child);
  }
  const rows=await extractPdfRows(file,kind);const out=[];
  const aliases={
@@ -102,5 +103,5 @@ function normalizeExcel(kind,r){
  return{parent:clean(get('parent','fgcode','fg')),child:clean(get('childcode','itemcode','code')),desc:clean(get('description','desc')),qty:num(get('qty','quantity')),uom:clean(get('uom'))};
 }
 const fileMap={inventoryFile:'inventory',storeFile:'store',voucherFile:'voucher',irFile:'ir',bomFile:'bom',slowFile:'slow'};
-Object.entries(fileMap).forEach(([id,kind])=>{document.getElementById(id).onchange=async e=>{const f=e.target.files[0];if(!f)return;showProgress(kind,'Starting...');try{const rows=await parseFile(f,kind);if(!rows.length){failProgress(kind,'No records detected in file');return}if(kind==='voucher'){rows.forEach(r=>{const inv=data.inventory.find(x=>x.code===r.code);if(inv)inv.closing=num(inv.closing)+r.demand;const st=data.store.find(x=>x.code===r.code);if(st)st.closing=num(st.closing)-r.demand})}setProgress(kind,'Saving...',97);data[kind]=data[kind].concat(rows);await save();render();doneProgress(kind,rows.length+' imported')}catch(err){failProgress(kind,'Import failed: '+err.message)}finally{e.target.value=''}}});
+Object.entries(fileMap).forEach(([id,kind])=>{const input=document.getElementById(id);if(!input)return;input.onchange=async e=>{const target=e&&e.target?e.target:null;const f=target&&target.files&&target.files[0];if(!f)return;showProgress(kind,'Starting...');try{const rows=await parseFile(f,kind);if(!rows.length){failProgress(kind,'No records detected in file');return}if(kind==='voucher'){rows.forEach(r=>{const inv=data.inventory.find(x=>x.code===r.code);if(inv)inv.closing=num(inv.closing)+r.demand;const st=data.store.find(x=>x.code===r.code);if(st)st.closing=num(st.closing)-r.demand})}setProgress(kind,'Saving...',97);data[kind]=data[kind].concat(rows);await save();render();doneProgress(kind,rows.length+' imported')}catch(err){console.error('Import error:',err);failProgress(kind,'Import failed: '+(err.message||err))}finally{if(target)target.value=''}}});
 render();initFirebase();
