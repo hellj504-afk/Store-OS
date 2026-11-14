@@ -1,0 +1,56 @@
+name: Repair description parser
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/repair-description.yml'
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch existing application
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('js/app.js')
+          s = p.read_text()
+          old = "const money=n=>(Number(n)||0).toLocaleString(undefined,{maximumFractionDigits:2});"
+          new = "const money=n=>new Intl.NumberFormat('en-US',{notation:'compact',compactDisplay:'short',maximumFractionDigits:2}).format(Number(n)||0);"
+          assert old in s, 'Money formatter changed; refusing unsafe patch'
+          s = s.replace(old,new,1)
+          old = "if(kind==='slow')after=after.replace(/^\\s*[A-Z0-9]{2,10}\\s+/i,'');"
+          lines = s.splitlines()
+          lines = [line for line in lines if not ("if(kind==='slow')after=after.replace" in line)]
+          s = '\n'.join(lines)+'\n'
+          old = 'const desc=columnDesc||fullDesc;'
+          assert old in s, 'Description selection changed; refusing unsafe patch'
+          s = s.replace(old,'const desc=fullDesc && /[A-Za-z]{3}/.test(fullDesc) ? fullDesc : columnDesc;',1)
+          old = "const codeText=columnValue(row,ranges,'code');const code=codeText.match(CODE_RE);const itemCode=code?code[0]:codeText;"
+          new = "const codeText=columnValue(row,ranges,kind==='bom'?'child':'code');const code=codeText.match(CODE_RE);const itemCode=code?code[0]:'';"
+          assert old in s, 'Item parser changed; refusing unsafe patch'
+          s = s.replace(old,new,1)
+          old = "if(!itemCode||itemCode.toLowerCase().includes('itemcode')){"
+          new = "if(!itemCode){ if(Object.keys(makeColumnMap(row,aliases[kind])).length>=3)continue;"
+          assert old in s
+          s = s.replace(old,new,1)
+          s = s.replace("const continuation=fixDescription(columnValue(row,ranges,'desc'));","const continuation=clean(columnValue(row,ranges,'desc'));",1)
+          s = s.replace("let d=clean(text);d=d.replace(/\\b(?:NOS|NOS\\.|PCS|KGS|KG|MTR|MTRS|LTR|LTRS|SET|SETS|PAD|GLN)\\b/gi,'');","let d=clean(text);")
+          p.write_text(s)
+          p = Path('index.html')
+          s = p.read_text().replace('js/app.js?v=4','js/app.js?v=description-2').replace('css/progress.css','css/progress.css?v=description-2')
+          p.write_text(s)
+          p = Path('css/progress.css')
+          s = p.read_text()
+          s += '\n#inventoryTable td:nth-child(4),#storeTable td:nth-child(4),#voucherTable td:nth-child(2),#irTable td:nth-child(2),#slowTable td:nth-child(2),#bomTable td:nth-child(3){white-space:normal!important;overflow:visible!important;text-overflow:clip!important;height:auto!important;max-height:none!important;min-width:360px;line-height:1.6;word-break:normal;overflow-wrap:break-word}\n'
+          p.write_text(s)
+      - name: Check JavaScript syntax
+        run: node --check js/app.js
+      - name: Commit verified patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add js/app.js index.html css/progress.css
+          git diff --cached --quiet || (git commit -m 'Fix incomplete PDF descriptions and compact monetary display' && git push)
