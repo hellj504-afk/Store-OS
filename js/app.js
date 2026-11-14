@@ -3,7 +3,7 @@ const KEYS=['inventory','store','voucher','ir','bom','slow'];
 let data=JSON.parse(localStorage.getItem('storeOS')||'{}');KEYS.forEach(k=>data[k]=data[k]||[]);
 let firebaseApi=null,saving=false;const filters={inventory:'',store:'',voucher:'',ir:'',bom:'',slow:''};
 if(typeof pdfjsLib!=='undefined'){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'}
-const money=n=>new Intl.NumberFormat('en-US',{notation:'compact',compactDisplay:'short',maximumFractionDigits:2}).format(Number(n)||0);
+const money=n=>{const x=Number(n)||0;const a=Math.abs(x);if(a>=1e9)return (x/1e9).toFixed(2).replace(/\.?0+$/,'')+'B';if(a>=1e6)return (x/1e6).toFixed(2).replace(/\.?0+$/,'')+'M';if(a>=1e3)return (x/1e3).toFixed(2).replace(/\.?0+$/,'')+'K';return String(x)};
 const rateOf=code=>{const i=data.slow.find(x=>String(x.code||'').trim()===String(code||'').trim());return i?Number(i.rate)||0:0};
 const toast=m=>{const t=document.getElementById('toast');if(!t)return;t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000)};
 function buttonProgress(kind,text,pct){const el=document.getElementById(kind+'Progress');if(el)el.textContent=text?pct+'%':''}
