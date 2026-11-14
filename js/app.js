@@ -155,11 +155,8 @@ async function parseFile(file,kind){
     if(previousPageLast&&part.text.length<=12)previousPageLast.desc=fixDescription((previousPageLast.desc||'')+' '+part.text);
     continue;
    }
-   const first=records[0];
-   if(previousPageLast&&part.y>first._anchorY&&part.text.length<=12){
-    previousPageLast.desc=fixDescription((previousPageLast.desc||'')+' '+part.text);
-    continue;
-   }
+   // If this page has item records, keep every continuation on this page.
+   // Only carry a short continuation to the previous page when this page has no records.
    let nearest=records[0],distance=Math.abs(part.y-nearest._anchorY);
    for(let i=1;i<records.length;i++){const d=Math.abs(part.y-records[i]._anchorY);if(d<distance){nearest=records[i];distance=d}}
    nearest._descParts.push(part);
