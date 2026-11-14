@@ -7,10 +7,10 @@ const money=n=>(Number(n)||0).toLocaleString(undefined,{maximumFractionDigits:2}
 const rateOf=code=>{const i=data.slow.find(x=>String(x.code||'').trim()===String(code||'').trim());return i?Number(i.rate)||0:0};
 const toast=m=>{const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000)};
 const progress={wrap:document.getElementById('progressWrap'),bar:document.getElementById('progressBar'),text:document.getElementById('progressText'),percent:document.getElementById('progressPercent')};
-function showProgress(text){progress.wrap.classList.add('show');progress.bar.className='progress-bar';progress.bar.style.width='0%';progress.percent.textContent='0%';progress.text.textContent=text}
-function setProgress(text,pct){progress.text.textContent=text;progress.percent.textContent=Math.round(pct)+'%';progress.bar.style.width=pct+'%'}
-function doneProgress(text){progress.text.textContent=text;progress.percent.textContent='100%';progress.bar.style.width='100%';progress.bar.classList.add('done');setTimeout(()=>progress.wrap.classList.remove('show'),2500)}
-function failProgress(text){progress.text.textContent=text;progress.bar.style.width='100%';progress.bar.classList.add('error');setTimeout(()=>progress.wrap.classList.remove('show'),4000)}
+function showProgress(text){if(!progress.wrap)return;progress.wrap.classList.add('show');progress.bar.className='progress-bar';progress.bar.style.width='0%';progress.percent.textContent='0%';progress.text.textContent=text}
+function setProgress(text,pct){if(!progress.wrap)return;progress.text.textContent=text;progress.percent.textContent=Math.round(pct)+'%';progress.bar.style.width=pct+'%'}
+function doneProgress(text){if(!progress.wrap)return;progress.text.textContent=text;progress.percent.textContent='100%';progress.bar.style.width='100%';progress.bar.classList.add('done');setTimeout(()=>progress.wrap.classList.remove('show'),2500)}
+function failProgress(text){if(!progress.wrap)return;progress.text.textContent=text;progress.bar.style.width='100%';progress.bar.classList.add('error');setTimeout(()=>progress.wrap.classList.remove('show'),4000)}
 async function initFirebase(){
  try{
   const [{initializeApp},{getFirestore,doc,getDoc,setDoc}]=await Promise.all([import('https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js'),import('https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js')]);
@@ -53,36 +53,42 @@ async function extractPdfRows(file){
   const arranged=[...rows.entries()].sort((a,b)=>b[0]-a[0]).map(([,cells])=>cells.sort((a,b)=>a.x-b.x));pages.push(...arranged);await new Promise(r=>setTimeout(r,10))}
  setProgress('Extracting records...',92);return pages;
 }
-function findHeader(rows,names){for(const row of rows){const map={};row.forEach((cell,i)=>{const t=cell.text.toLowerCase().replace(/[^a-z]/g,'');for(const[key,keys]of Object.entries(names)){if(keys.some(k=>t===k||t.includes(k)))map[key]=i}});if(Object.keys(map).length>=5)return map}return null}
-function cellAt(row,index){return index==null?'':clean((row[index]||{}).text)}
-function numberAt(row,index){return num(cellAt(row,index))}
-const CODE_RE=/\b(?:FG|RM|CM|SS|WIP|GI|SCR)\d{2,5}(?:-\d+)*-\d{2}-\d{3}\b/i;
-function parseInventoryRow(row,h){
- const code=cellAt(row,h.code).match(CODE_RE);const itemCode=code?code[0]:cellAt(row,h.code);
- if(!itemCode||itemCode.toLowerCase().includes('itemcode'))return null;
- const nums=[];for(let i=h.opening;i<=h.closing;i++)nums.push(numberAt(row,i));
- return{sub:cellAt(row,h.sub).replace(/^'/,''),locator:cellAt(row,h.locator),code:itemCode,desc:cellAt(row,h.desc),uom:cellAt(row,h.uom),opening:nums[0]||0,received:nums[1]||0,issued:nums[2]||0,closing:nums[3] ?? (nums[0] || 0)};
+function makeColumnMap(header,aliases){
+ const cols={};header.forEach((cell,i)=>{const t=cell.text.toLowerCase().replace(/[^a-z]/g,'');for(const[key,keys]of Object.entries(aliases)){if(!cols[key]&&keys.some(k=>t===k||t.includes(k)))cols[key]={index:i,x:cell.x}}});
+ const keys=Object.values(cols).sort((a,b)=>a.x-b.x);const ranges={};
+ keys.forEach((c,i)=>{const next=keys[i+1];ranges[Object.keys(cols).find(k=>cols[k]===c)]={start:c.x-8,end:next?next.x-8:99999}});
+ return ranges;
 }
+function columnValue(row,ranges,key){const range=ranges[key];if(!range)return '';let text='';row.forEach(cell=>{if(cell.x>=range.start&&cell.x<range.end)text+=' '+cell.text});return clean(text)}
+function columnNumber(row,ranges,key){return num(columnValue(row,ranges,key))}
+const CODE_RE=/\b(?:FG|RM|CM|SS|WIP|GI|SCR)\d{2,5}(?:-\d+)*-\d{2}-\d{3}\b/i;
+const UOM_RE=/^\s*(?:NOS|NOS\.|PCS|KGS|KG|MTR|MTRS|LTR|LTRS|SET|SETS|PAD|GLN)\s*$/i;
 async function parseFile(file,kind){
  if(!file.name.toLowerCase().endsWith('.pdf')){
   showProgress('Reading Excel file...');setProgress('Reading Excel file...',45);const wb=XLSX.read(await file.arrayBuffer());const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:'',raw:false});setProgress('Extracting records...',90);return raw.map(r=>normalizeExcel(kind,r)).filter(r=>r.code||r.child);
  }
  const rows=await extractPdfRows(file);const out=[];
- if(kind==='inventory'||kind==='store'){
-  const h=findHeader(rows,{sub:['subinventory'],locator:['locator'],code:['itemcode'],desc:['itemdescription','description'],uom:['uom'],opening:['opening'],received:['received'],issued:['issued'],closing:['closing']});
-  if(!h)return[];
-  for(const row of rows){const r=parseInventoryRow(row,h);if(r)out.push(r)}
- }else{
-  const aliases={slow:{code:['itemcode'],desc:['itemdescription'],uom:['uom'],stock:['stock'],rate:['rate'],value:['value'],location:['location']},voucher:{code:['itemcode'],desc:['description'],locator:['destinationlocator'],demand:['demandqty'],balance:['balanceqty']},ir:{code:['itemcode'],desc:['description'],locator:['destinationlocator'],fb:['fbnum','fbno'],serial:['serialnum','serialno'],reference:['reference'],demand:['demandqty'],balance:['balanceqty']},bom:{parent:['parent','fgcode'],child:['childcode','itemcode'],desc:['description'],qty:['qty','quantity'],uom:['uom']}};
-  const h=findHeader(rows,aliases[kind]);if(!h)return[];
-  for(const row of rows){
-   const code=cellAt(row,h.code).match(CODE_RE);const itemCode=code?code[0]:cellAt(row,h.code);
-   if(!itemCode||itemCode.toLowerCase().includes('itemcode'))continue;
-   if(kind==='slow')out.push({code:itemCode,desc:cellAt(row,h.desc),uom:cellAt(row,h.uom),stock:numberAt(row,h.stock),rate:numberAt(row,h.rate),value:numberAt(row,h.value),location:cellAt(row,h.location)});
-   else if(kind==='voucher')out.push({code:itemCode,desc:cellAt(row,h.desc),locator:cellAt(row,h.locator),demand:numberAt(row,h.demand),balance:numberAt(row,h.balance)});
-   else if(kind==='ir')out.push({code:itemCode,desc:cellAt(row,h.desc),locator:cellAt(row,h.locator),fb:cellAt(row,h.fb),serial:cellAt(row,h.serial),reference:cellAt(row,h.reference),demand:numberAt(row,h.demand),balance:numberAt(row,h.balance)});
-   else out.push({parent:cellAt(row,h.parent),child:itemCode,desc:cellAt(row,h.desc),qty:numberAt(row,h.qty),uom:cellAt(row,h.uom)});
-  }
+ const aliases={
+  inventory:{sub:['subinventory'],locator:['locator'],code:['itemcode'],desc:['itemdescription','description'],uom:['uom'],opening:['opening'],received:['received'],issued:['issued'],closing:['closing']},
+  store:{sub:['subinventory'],locator:['locator'],code:['itemcode'],desc:['itemdescription','description'],uom:['uom'],opening:['opening'],received:['received'],issued:['issued'],closing:['closing']},
+  slow:{code:['itemcode'],desc:['itemdescription'],uom:['uom'],stock:['stock'],rate:['rate'],value:['value'],location:['location']},
+  voucher:{code:['itemcode'],desc:['description'],locator:['destinationlocator'],demand:['demandqty'],balance:['balanceqty']},
+  ir:{code:['itemcode'],desc:['description'],locator:['destinationlocator'],fb:['fbnum','fbno'],serial:['serialnum','serialno'],reference:['reference'],demand:['demandqty'],balance:['balanceqty']},
+  bom:{parent:['parent','fgcode'],child:['childcode','itemcode'],desc:['description'],qty:['qty','quantity'],uom:['uom']}
+ };
+ let ranges=null;
+ for(const row of rows){
+  if(!ranges){const candidate=makeColumnMap(row,aliases[kind]);if(Object.keys(candidate).length>=5){ranges=candidate;continue}}
+  const codeText=columnValue(row,ranges,'code');const code=codeText.match(CODE_RE);const itemCode=code?code[0]:codeText;
+  if(!itemCode||itemCode.toLowerCase().includes('itemcode'))continue;
+  if(kind==='inventory'||kind==='store'){
+   let desc=columnValue(row,ranges,'desc');const uom=columnValue(row,ranges,'uom');
+   if(!uom&&UOM_RE.test(desc)){const m=desc.match(UOM_RE);desc=clean(desc.replace(m[0],''))}
+   out.push({sub:columnValue(row,ranges,'sub').replace(/^'/,''),locator:columnValue(row,ranges,'locator'),code:itemCode,desc,uom:uom||'NOS',opening:columnNumber(row,ranges,'opening'),received:columnNumber(row,ranges,'received'),issued:columnNumber(row,ranges,'issued'),closing:columnNumber(row,ranges,'closing')})
+  }else if(kind==='slow'){out.push({code:itemCode,desc:columnValue(row,ranges,'desc'),uom:columnValue(row,ranges,'uom'),stock:columnNumber(row,ranges,'stock'),rate:columnNumber(row,ranges,'rate'),value:columnNumber(row,ranges,'value'),location:columnValue(row,ranges,'location')})}
+  else if(kind==='voucher'){out.push({code:itemCode,desc:columnValue(row,ranges,'desc'),locator:columnValue(row,ranges,'locator'),demand:columnNumber(row,ranges,'demand'),balance:columnNumber(row,ranges,'balance')})}
+  else if(kind==='ir'){out.push({code:itemCode,desc:columnValue(row,ranges,'desc'),locator:columnValue(row,ranges,'locator'),fb:columnValue(row,ranges,'fb'),serial:columnValue(row,ranges,'serial'),reference:columnValue(row,ranges,'reference'),demand:columnNumber(row,ranges,'demand'),balance:columnNumber(row,ranges,'balance')})}
+  else{out.push({parent:columnValue(row,ranges,'parent'),child:itemCode,desc:columnValue(row,ranges,'desc'),qty:columnNumber(row,ranges,'qty'),uom:columnValue(row,ranges,'uom')})}
  }
  const seen=new Set();return out.filter(r=>{const k=(r.code||r.child||'')+'|'+(r.locator||'')+'|'+(r.sub||'');if(seen.has(k))return false;seen.add(k);return true});
 }
