@@ -67,7 +67,14 @@ async function extractPdfRows(file,kind){
   const items=rawItems.filter(i=>i&&typeof i.str==='string'&&i.str.trim()&&i.transform).map(i=>({text:clean(i.str),x:Math.round(i.transform?.[4]||0),y:Math.round(i.transform?.[5]||0)})).filter(i=>i.text&&!isHeaderNoise(i.text));
   items.sort((a,b)=>b.y-a.y||a.x-b.x);
   const rows=[];let current=[];let currentY=null;
-  items.forEach(item=>{if(currentY===null||Math.abs(item.y-currentY)<=4){current.push(item);currentY=currentY===null?item.y:currentY}else{rows.push(current.sort((a,b)=>a.x-b.x));current=[item];currentY=item.y}});
+  items.forEach(item=>{
+   if(currentY===null||Math.abs(item.y-currentY)<=7){
+    current.push(item);
+    currentY=currentY===null?item.y:(currentY*(current.length-1)+item.y)/current.length;
+   }else{
+    rows.push(current.sort((a,b)=>a.x-b.x));current=[item];currentY=item.y;
+   }
+  });
   if(current.length)rows.push(current.sort((a,b)=>a.x-b.x));
   rows.forEach(row=>{row._page=p;row._y=row.reduce((sum,item)=>sum+item.y,0)/row.length});
   pages.push(...rows);await new Promise(r=>setTimeout(r,10))
@@ -119,7 +126,7 @@ async function parseFile(file,kind){
    if(!ranges){if(Object.keys(candidate).length>=5){ranges=candidate;continue}}
    if(!ranges)continue;
    if(Object.keys(candidate).length>=3)continue;
-   const codeText=columnValue(row,ranges,kind==='bom'?'child':'code');
+   const codeText=columnValue(row,ranges,kind==='bom'?'child':'code').replace(/\s+/g,'');
    const code=codeText.match(CODE_RE);const itemCode=code?code[0]:'';
    if(!itemCode){
     const continuation=fixDescription(columnValue(row,ranges,'desc'));
