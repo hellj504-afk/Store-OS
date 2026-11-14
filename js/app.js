@@ -19,9 +19,9 @@ async function initFirebase(){
   firebaseApi={load:async s=>{const snap=await getDoc(ref(s));return snap.exists()?snap.data().items||[]:[]},save:async(s,items)=>{await setDoc(ref(s),{items,updatedAt:new Date().toISOString()})}};
   for(const k of KEYS){const remote=await firebaseApi.load(k);if(remote.length)data[k]=remote}
   render();toast('Firebase connected')
- }catch(e){console.error(e);toast('Firebase unavailable — using local storage')}
+ }catch(e){console.error('Firebase connection error:',e);const reason=e&&e.code?e.code:(e&&e.message?e.message:'unknown error');toast('Firebase error: '+reason)}
 }
-async function save(){localStorage.setItem('storeOS',JSON.stringify(data));if(!firebaseApi||saving)return;saving=true;try{await Promise.all(KEYS.map(k=>firebaseApi.save(k,data[k])))}catch(e){toast('Firebase save failed')}finally{saving=false}}
+async function save(){localStorage.setItem('storeOS',JSON.stringify(data));if(!firebaseApi||saving)return;saving=true;try{await Promise.all(KEYS.map(k=>firebaseApi.save(k,data[k])))}catch(e){console.error('Firebase save error:',e);toast('Firebase save error: '+(e.code||e.message||'unknown'))}finally{saving=false}}
 function render(){
  const invTotal=data.inventory.reduce((s,r)=>s+(Number(r.closing)||0)*rateOf(r.code),0);
  const storeTotal=data.store.reduce((s,r)=>s+(Number(r.closing)||0)*rateOf(r.code),0);
