@@ -1,1 +1,122 @@
-BUTTON_PROGRESS_HTML_PLACEHOLDER
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Store OS — Inventory Management System</title>
+<meta name="description" content="Store OS — Inventory, Store, Vouchers, IR/Move Orders, BOM and Slow Moving cost management.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%234f8cff'/><text x='50' y='68' font-size='58' font-family='Arial' font-weight='bold' text-anchor='middle' fill='white'>S</text></svg>">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/progress.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+<div class="bg-orbs"><span></span><span></span><span></span></div>
+
+<header class="glass topbar">
+  <div class="brand"><div class="logo">S</div><div><h1>Store OS</h1><p>Inventory Management System</p></div></div>
+  <nav>
+    <button class="nav-btn active" data-view="dashboard">Dashboard</button>
+    <button class="nav-btn" data-view="inventory">Floor Inventory</button>
+    <button class="nav-btn" data-view="store">Store</button>
+    <button class="nav-btn" data-view="voucher">Issue Voucher</button>
+    <button class="nav-btn" data-view="ir">IR / Move Order</button>
+    <button class="nav-btn" data-view="bom">BOM</button>
+    <button class="nav-btn" data-view="slow">Slow Moving</button>
+  </nav>
+</header>
+
+<main>
+<section id="dashboard" class="view active">
+  <h2>Dashboard</h2>
+  <div class="cards">
+    <div class="glass card"><h3>Floor Inventory Cost</h3><p id="invTotal">0</p></div>
+    <div class="glass card"><h3>Store Cost</h3><p id="storeTotal">0</p></div>
+    <div class="glass card"><h3>Total Items</h3><p id="itemTotal">0</p></div>
+  </div>
+  <div class="glass panel"><h3>Cost Breakdown</h3><canvas id="chart" height="220"></canvas></div>
+</section>
+
+<section id="inventory" class="view">
+  <h2>Floor Inventory</h2>
+  <div class="glass panel upload-panel">
+    <label class="file-btn" id="inventoryBtn">Import PDF / Excel <span id="inventoryProgress"></span><input type="file" id="inventoryFile" accept=".pdf,.xlsx,.xls,.csv"></label>
+    <button class="btn primary" data-add="inventory">+ Add Manually</button>
+    <button class="btn danger" data-clear="inventory">Clear All</button>
+  </div>
+  <div class="glass panel"><div class="table-wrap"><table id="inventoryTable"></table></div></div>
+</section>
+
+<section id="store" class="view">
+  <h2>Store</h2>
+  <div class="glass panel upload-panel">
+    <label class="file-btn" id="storeBtn">Import PDF / Excel <span id="storeProgress"></span><input type="file" id="storeFile" accept=".pdf,.xlsx,.xls,.csv"></label>
+    <button class="btn primary" data-add="store">+ Add Manually</button>
+    <button class="btn danger" data-clear="store">Clear All</button>
+  </div>
+  <div class="glass panel"><div class="table-wrap"><table id="storeTable"></table></div></div>
+</section>
+
+<section id="voucher" class="view">
+  <h2>Issue Voucher</h2>
+  <p class="note">Voucher items increase Floor Inventory and decrease Store quantity.</p>
+  <div class="glass panel upload-panel">
+    <label class="file-btn" id="voucherBtn">Import PDF / Excel <span id="voucherProgress"></span><input type="file" id="voucherFile" accept=".pdf,.xlsx,.xls,.csv"></label>
+    <button class="btn primary" data-add="voucher">+ Add Manually</button>
+    <button class="btn danger" data-clear="voucher">Clear All</button>
+  </div>
+  <div class="glass panel"><div class="table-wrap"><table id="voucherTable"></table></div></div>
+</section>
+
+<section id="ir" class="view">
+  <h2>IR / Move Order</h2>
+  <div class="glass panel upload-panel">
+    <label class="file-btn" id="irBtn">Import PDF / Excel <span id="irProgress"></span><input type="file" id="irFile" accept=".pdf,.xlsx,.xls,.csv"></label>
+    <button class="btn primary" data-add="ir">+ Add Manually</button>
+    <button class="btn danger" data-clear="ir">Clear All</button>
+  </div>
+  <div class="glass panel"><div class="table-wrap"><table id="irTable"></table></div></div>
+</section>
+
+<section id="bom" class="view">
+  <h2>BOM</h2>
+  <div class="glass panel upload-panel">
+    <label class="file-btn" id="bomBtn">Import BOM PDF / Excel <span id="bomProgress"></span><input type="file" id="bomFile" accept=".pdf,.xlsx,.xls,.csv"></label>
+    <button class="btn primary" data-add="bom">+ Add Manually</button>
+    <button class="btn danger" data-clear="bom">Clear All</button>
+  </div>
+  <div class="glass panel">
+    <input id="bomSearch" class="input" placeholder="Search parent / FG item code...">
+    <div class="table-wrap"><table id="bomTable"></table></div>
+    <div class="bom-total">BOM Cost: <strong id="bomCost">0</strong></div>
+  </div>
+</section>
+
+<section id="slow" class="view">
+  <h2>Slow Moving Inventory</h2>
+  <div class="glass panel upload-panel">
+    <label class="file-btn" id="slowBtn">Import Slow Moving PDF / Excel <span id="slowProgress"></span><input type="file" id="slowFile" accept=".pdf,.xlsx,.xls,.csv"></label>
+    <button class="btn primary" data-add="slow">+ Add Manually</button>
+    <button class="btn danger" data-clear="slow">Clear All</button>
+  </div>
+  <div class="glass panel"><div class="table-wrap"><table id="slowTable"></table></div></div>
+</section>
+</main>
+
+<div class="modal glass" id="modal">
+  <div class="modal-box">
+    <h3 id="modalTitle">Add Item</h3>
+    <div id="modalFields"></div>
+    <div class="modal-actions"><button class="btn ghost" id="modalCancel">Cancel</button><button class="btn primary" id="modalSave">Save</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script>
+document.querySelectorAll('.nav-btn').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));btn.classList.add('active');const target=document.getElementById(btn.dataset.view);if(target)target.classList.add('active')})});
+window.addEventListener('error',e=>{const d=document.createElement('div');d.style.cssText='position:fixed;inset:auto 16px 16px 16px;background:#7f1d1d;color:#fff;padding:14px;border-radius:12px;z-index:999;font:13px monospace';d.textContent='Error: '+(e.message||e.type);document.body.appendChild(d)});
+</script>
+<script type="module" src="js/app.js?v=3"></script>
+</body>
+</html>
