@@ -3,7 +3,7 @@ const KEYS=['inventory','store','voucher','ir','bom','slow'];
 let data=JSON.parse(localStorage.getItem('storeOS')||'{}');KEYS.forEach(k=>data[k]=data[k]||[]);
 let firebaseApi=null,saving=false;const filters={inventory:'',store:'',voucher:'',ir:'',bom:'',slow:''};
 if(typeof pdfjsLib!=='undefined'){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'}
-const money=n=>(Number(n)||0).toLocaleString(undefined,{maximumFractionDigits:2});
+const money=n=>new Intl.NumberFormat('en-US',{notation:'compact',compactDisplay:'short',maximumFractionDigits:2}).format(Number(n)||0);
 const rateOf=code=>{const i=data.slow.find(x=>String(x.code||'').trim()===String(code||'').trim());return i?Number(i.rate)||0:0};
 const toast=m=>{const t=document.getElementById('toast');if(!t)return;t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000)};
 function buttonProgress(kind,text,pct){const el=document.getElementById(kind+'Progress');if(el)el.textContent=text?pct+'%':''}
@@ -85,12 +85,11 @@ function rowText(row){return clean((row||[]).map(c=>c&&c.text?c.text:'').join(' 
 function fullDescription(row,itemCode,kind){
  const text=rowText(row);const codeIndex=text.toLowerCase().indexOf(String(itemCode||'').toLowerCase());if(codeIndex<0)return '';
  let after=text.slice(codeIndex+String(itemCode).length);
- if(kind==='slow')after=after.replace(/^\s*[A-Z0-9]{2,10}\s+/i,'');
  const uom=after.match(/\b(?:NOS|NOS\.|PCS|KGS|KG|MTR|MTRS|LTR|LTRS|SET|SETS|PAD|GLN)\b/i);
  if(uom&&uom.index>=0)after=after.slice(0,uom.index);
  return clean(after.replace(/^[-\s]+/,''));
 }
-function fixDescription(text){let d=clean(text);d=d.replace(/\b(?:NOS|NOS\.|PCS|KGS|KG|MTR|MTRS|LTR|LTRS|SET|SETS|PAD|GLN)\b/gi,'');d=d.replace(/\s+/g,' ').trim();return d}
+function fixDescription(text){let d=clean(text);d=d.replace(/\s+/g,' ').trim();return d}
 const CODE_RE=/\b(?:FG|RM|CM|SS|WIP|GI|SCR)\d{2,5}(?:-\d+)*-\d{2}-\d{3}\b/i;
 const UOM_RE=/^\s*(?:NOS|NOS\.|PCS|KGS|KG|MTR|MTRS|LTR|LTRS|SET|SETS|PAD|GLN)\s*$/i;
 async function parseFile(file,kind){
@@ -112,15 +111,15 @@ async function parseFile(file,kind){
  for(const row of rows){
   if(!ranges){const candidate=makeColumnMap(row,aliases[kind]);if(Object.keys(candidate).length>=5){ranges=candidate;continue}}
   if(!ranges)continue;
-  const codeText=columnValue(row,ranges,'code');const code=codeText.match(CODE_RE);const itemCode=code?code[0]:codeText;
-  if(!itemCode||itemCode.toLowerCase().includes('itemcode')){
-   const continuation=fixDescription(columnValue(row,ranges,'desc'));
+  const codeText=columnValue(row,ranges,kind==='bom'?'child':'code');const code=codeText.match(CODE_RE);const itemCode=code?code[0]:'';
+  if(!itemCode){ if(Object.keys(makeColumnMap(row,aliases[kind])).length>=3)continue;
+   const continuation=clean(columnValue(row,ranges,'desc'));
    if(continuation&&out.length){const last=out[out.length-1];last.desc=clean((last.desc||'')+' '+continuation)}
    continue;
   }
   const columnDesc=fixDescription(columnValue(row,ranges,'desc'));
   const fullDesc=fullDescription(row,itemCode,kind);
-  const desc=columnDesc||fullDesc;
+  const desc=fullDesc && /[A-Za-z]{3}/.test(fullDesc) ? fullDesc : columnDesc;
   if(kind==='inventory'||kind==='store'){
    const uom=columnValue(row,ranges,'uom');
    out.push({sub:columnValue(row,ranges,'sub').replace(/^'/,''),locator:columnValue(row,ranges,'locator'),code:itemCode,desc,uom:uom||'NOS',opening:columnNumber(row,ranges,'opening'),received:columnNumber(row,ranges,'received'),issued:columnNumber(row,ranges,'issued'),closing:columnNumber(row,ranges,'closing')})

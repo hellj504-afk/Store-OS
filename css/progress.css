@@ -6,3 +6,5 @@ td:nth-child(4),th:nth-child(4){min-width:360px;max-width:640px}
 .search-bar{margin-bottom:14px}
 .search-bar .input{width:100%;padding:12px 16px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:#fff;font-size:14px}
 .search-bar .input::placeholder{color:#9aa7c7}
+
+#inventoryTable td:nth-child(4),#storeTable td:nth-child(4),#voucherTable td:nth-child(2),#irTable td:nth-child(2),#slowTable td:nth-child(2),#bomTable td:nth-child(3){white-space:normal!important;overflow:visible!important;text-overflow:clip!important;height:auto!important;max-height:none!important;min-width:360px;line-height:1.6;word-break:normal;overflow-wrap:break-word}
