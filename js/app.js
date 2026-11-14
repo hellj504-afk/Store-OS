@@ -12,7 +12,6 @@ function setProgress(kind,text,pct){buttonProgress(kind,text,pct)}
 function doneProgress(kind,text){buttonProgress(kind,text,100);setTimeout(()=>buttonProgress(kind,'',0),2500)}
 function failProgress(kind,text){buttonProgress(kind,'Error',100);toast(text);setTimeout(()=>buttonProgress(kind,'',0),6000)}
 function addSearchBars(){KEYS.forEach(k=>{const table=document.getElementById(k+'Table');if(!table||table.previousElementSibling&&table.previousElementSibling.classList.contains('search-bar'))return;const wrap=document.createElement('div');wrap.className='search-bar';wrap.innerHTML='<input class="input" id="'+k+'Search" placeholder="Instant search: item code, description, locator...">';table.parentNode.insertBefore(wrap,table);const input=wrap.querySelector('input');input.value=filters[k];input.addEventListener('input',()=>{filters[k]=input.value.toLowerCase();render()})})}
-const match=(row,fields)=>{const q=filters[arguments[2]]||'';if(!q)return true;return fields.some(f=>String(row[f]||'').toLowerCase().includes(q))};
 async function initFirebase(){
  try{
   const [{initializeApp},{getFirestore,doc,getDoc,setDoc}]=await Promise.all([import('https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js'),import('https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js')]);
@@ -102,7 +101,11 @@ async function parseFile(file,kind){
   if(!ranges){const candidate=makeColumnMap(row,aliases[kind]);if(Object.keys(candidate).length>=5){ranges=candidate;continue}}
   if(!ranges)continue;
   const codeText=columnValue(row,ranges,'code');const code=codeText.match(CODE_RE);const itemCode=code?code[0]:codeText;
-  if(!itemCode||itemCode.toLowerCase().includes('itemcode'))continue;
+  if(!itemCode||itemCode.toLowerCase().includes('itemcode')){
+   const continuation=fixDescription(columnValue(row,ranges,'desc'));
+   if(continuation&&out.length){const last=out[out.length-1];last.desc=clean((last.desc||'')+' '+continuation)}
+   continue;
+  }
   if(kind==='inventory'||kind==='store'){
    let desc=fixDescription(columnValue(row,ranges,'desc'));const uom=columnValue(row,ranges,'uom');
    if(!uom&&UOM_RE.test(desc)){const m=desc.match(UOM_RE);desc=clean(desc.replace(m[0],''))}
