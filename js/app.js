@@ -47,10 +47,19 @@ function clean(s){return String(s||'').replace(/\s+/g,' ').trim()}
 function isHeaderNoise(text){const t=text.toLowerCase();return t.includes('pak elektron')||t.includes('slow moving inventory status')||t.includes('subinventory / locator wise')||t.includes('unit 2 itr')||t.includes('from locator')||t.includes('to locator')||t.includes('from date')||t.includes('to date')||t.includes('subinventory:')||t.includes('printed by')||t.includes('page ')||t.includes('inv. group')||t.includes('aging:')}
 async function extractPdfRows(file,kind){
  if(typeof pdfjsLib==='undefined'||!pdfjsLib)throw new Error('PDF reader library not loaded. Internet/ad-blocker check karein.');
- const buf=await file.arrayBuffer();const pdf=await pdfjsLib.getDocument({data:buf}).promise;if(!pdf)throw new Error('PDF could not be opened');const total=pdf.numPages;const pages=[];
- for(let p=1;p<=total;p++){setProgress(kind,'Reading page '+p+' of '+total,Math.round(((p-1)/total)*90));const page=await pdf.getPage(p);const tc=await page.getTextContent();const items=(tc&&tc.items?tc.items:[]).map(i=>({text:clean(i.str),x:Math.round(i.transform[4]),y:Math.round(i.transform[5])})).filter(i=>i.text&&!isHeaderNoise(i.text));
+ const buf=await file.arrayBuffer();let pdf;
+ try{pdf=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise}catch(e){throw new Error('PDF could not be opened: '+(e.message||e))}
+ if(!pdf||!pdf.numPages)throw new Error('PDF has no readable pages');
+ const total=pdf.numPages;const pages=[];
+ for(let p=1;p<=total;p++){
+  setProgress(kind,'Reading page '+p+' of '+total,Math.round(((p-1)/total)*90));
+  let page,tc;
+  try{page=await pdf.getPage(p);tc=await page.getTextContent()}catch(e){throw new Error('PDF page '+p+' could not be read: '+(e.message||e))}
+  const rawItems=tc&&Array.isArray(tc.items)?tc.items:[];
+  const items=rawItems.filter(i=>i&&typeof i.str==='string'&&i.str.trim()&&i.transform).map(i=>({text:clean(i.str),x:Math.round(i.transform?.[4]||0),y:Math.round(i.transform?.[5]||0)})).filter(i=>i.text&&!isHeaderNoise(i.text));
   const rows=new Map();items.forEach(i=>{const y=Math.round(i.y/3)*3;if(!rows.has(y))rows.set(y,[]);rows.get(y).push(i)});
-  const arranged=[...rows.entries()].sort((a,b)=>b[0]-a[0]).map(([,cells])=>cells.sort((a,b)=>a.x-b.x));pages.push(...arranged);await new Promise(r=>setTimeout(r,10))}
+  const arranged=[...rows.entries()].sort((a,b)=>b[0]-a[0]).map(([,cells])=>cells.sort((a,b)=>a.x-b.x));pages.push(...arranged);await new Promise(r=>setTimeout(r,10))
+ }
  setProgress(kind,'Extracting records...',92);return pages;
 }
 function makeColumnMap(header,aliases){
