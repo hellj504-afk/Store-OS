@@ -1,7 +1,7 @@
 const FIELDS={inventory:[['sub','Sub Inventory'],['locator','Locator'],['code','Item Code'],['desc','Description'],['uom','UOM'],['opening','Opening'],['received','Received'],['issued','Issued'],['closing','Closing']],store:[['sub','Sub Inventory'],['locator','Locator'],['code','Item Code'],['desc','Description'],['uom','UOM'],['opening','Opening'],['received','Received'],['issued','Issued'],['closing','Closing']],voucher:[['code','Item Code'],['desc','Description'],['locator','Destination Locator'],['demand','Demand Qty'],['balance','Balance Qty']],ir:[['code','Item Code'],['desc','Description'],['locator','Destination Locator'],['fb','F.B No.'],['serial','Serial No.'],['reference','Reference'],['demand','Demand Qty'],['balance','Balance Qty']],bom:[['parent','Parent / FG Code'],['child','Child Item Code'],['desc','Description'],['qty','Qty'],['uom','UOM']],slow:[['code','Item Code'],['desc','Description'],['uom','UOM'],['stock','Stock'],['rate','Rate'],['value','Value'],['location','Location']]};
 const KEYS=['inventory','store','voucher','ir','bom','slow'];
 let data=JSON.parse(localStorage.getItem('storeOS')||'{}');KEYS.forEach(k=>data[k]=data[k]||[]);
-let firebaseApi=null,saving=false;
+let firebaseApi=null,saving=false;const filters={inventory:'',store:'',voucher:'',ir:'',bom:'',slow:''};
 if(typeof pdfjsLib!=='undefined'){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'}
 const money=n=>(Number(n)||0).toLocaleString(undefined,{maximumFractionDigits:2});
 const rateOf=code=>{const i=data.slow.find(x=>String(x.code||'').trim()===String(code||'').trim());return i?Number(i.rate)||0:0};
@@ -11,6 +11,8 @@ function showProgress(kind,text){buttonProgress(kind,text,1)}
 function setProgress(kind,text,pct){buttonProgress(kind,text,pct)}
 function doneProgress(kind,text){buttonProgress(kind,text,100);setTimeout(()=>buttonProgress(kind,'',0),2500)}
 function failProgress(kind,text){buttonProgress(kind,'Error',100);toast(text);setTimeout(()=>buttonProgress(kind,'',0),6000)}
+function addSearchBars(){KEYS.forEach(k=>{const table=document.getElementById(k+'Table');if(!table||table.previousElementSibling&&table.previousElementSibling.classList.contains('search-bar'))return;const wrap=document.createElement('div');wrap.className='search-bar';wrap.innerHTML='<input class="input" id="'+k+'Search" placeholder="Instant search: item code, description, locator...">';table.parentNode.insertBefore(wrap,table);const input=wrap.querySelector('input');input.value=filters[k];input.addEventListener('input',()=>{filters[k]=input.value.toLowerCase();render()})})}
+const match=(row,fields)=>{const q=filters[arguments[2]]||'';if(!q)return true;return fields.some(f=>String(row[f]||'').toLowerCase().includes(q))};
 async function initFirebase(){
  try{
   const [{initializeApp},{getFirestore,doc,getDoc,setDoc}]=await Promise.all([import('https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js'),import('https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js')]);
@@ -23,25 +25,32 @@ async function initFirebase(){
 }
 async function save(){localStorage.setItem('storeOS',JSON.stringify(data));if(!firebaseApi||saving)return;saving=true;try{await Promise.all(KEYS.map(k=>firebaseApi.save(k,data[k])))}catch(e){console.error('Firebase save error:',e);toast('Firebase save error: '+(e.code||e.message||'unknown'))}finally{saving=false}}
 function render(){
+ addSearchBars();
  const invTotal=data.inventory.reduce((s,r)=>s+(Number(r.closing)||0)*rateOf(r.code),0);
  const storeTotal=data.store.reduce((s,r)=>s+(Number(r.closing)||0)*rateOf(r.code),0);
  const invTotalEl=document.getElementById('invTotal');const storeTotalEl=document.getElementById('storeTotal');const itemTotalEl=document.getElementById('itemTotal');
  if(invTotalEl)invTotalEl.textContent=money(invTotal);if(storeTotalEl)storeTotalEl.textContent=money(storeTotal);if(itemTotalEl)itemTotalEl.textContent=data.inventory.length+data.store.length;
  drawChart(invTotal,storeTotal);
- table('inventoryTable',['Sub Inventory','Locator','Item Code','Description','UOM','Opening','Received','Issued','Closing','Rate','Cost'],data.inventory.map(r=>[r.sub,r.locator,r.code,r.desc,r.uom,r.opening,r.received,r.issued,r.closing,money(rateOf(r.code)),money((Number(r.closing)||0)*rateOf(r.code))]));
- table('storeTable',['Sub Inventory','Locator','Item Code','Description','UOM','Opening','Received','Issued','Closing','Rate','Cost'],data.store.map(r=>[r.sub,r.locator,r.code,r.desc,r.uom,r.opening,r.received,r.issued,r.closing,money(rateOf(r.code)),money((Number(r.closing)||0)*rateOf(r.code))]));
- table('voucherTable',['Item Code','Description','Destination Locator','Demand Qty','Balance Qty'],data.voucher.map(r=>[r.code,r.desc,r.locator,r.demand,r.balance]));
- table('irTable',['Item Code','Description','Destination Locator','F.B No.','Serial No.','Reference','Demand Qty','Balance Qty'],data.ir.map(r=>[r.code,r.desc,r.locator,r.fb,r.serial,r.reference,r.demand,r.balance]));
- renderBom();table('slowTable',['Item Code','Description','UOM','Stock','Rate','Value','Location'],data.slow.map(r=>[r.code,r.desc,r.uom,r.stock,money(r.rate),money(r.value),r.location]));save();
+ const invRows=data.inventory.filter(r=>matches(r,['sub','locator','code','desc'],'inventory'));
+ const storeRows=data.store.filter(r=>matches(r,['sub','locator','code','desc'],'store'));
+ const voucherRows=data.voucher.filter(r=>matches(r,['code','desc','locator'],'voucher'));
+ const irRows=data.ir.filter(r=>matches(r,['code','desc','locator','fb','serial','reference'],'ir'));
+ const slowRows=data.slow.filter(r=>matches(r,['code','desc','location'],'slow'));
+ table('inventoryTable',['Sub Inventory','Locator','Item Code','Description','UOM','Opening','Received','Issued','Closing','Rate','Cost'],invRows.map(r=>[r.sub,r.locator,r.code,r.desc,r.uom,r.opening,r.received,r.issued,r.closing,money(rateOf(r.code)),money((Number(r.closing)||0)*rateOf(r.code))]));
+ table('storeTable',['Sub Inventory','Locator','Item Code','Description','UOM','Opening','Received','Issued','Closing','Rate','Cost'],storeRows.map(r=>[r.sub,r.locator,r.code,r.desc,r.uom,r.opening,r.received,r.issued,r.closing,money(rateOf(r.code)),money((Number(r.closing)||0)*rateOf(r.code))]));
+ table('voucherTable',['Item Code','Description','Destination Locator','Demand Qty','Balance Qty'],voucherRows.map(r=>[r.code,r.desc,r.locator,r.demand,r.balance]));
+ table('irTable',['Item Code','Description','Destination Locator','F.B No.','Serial No.','Reference','Demand Qty','Balance Qty'],irRows.map(r=>[r.code,r.desc,r.locator,r.fb,r.serial,r.reference,r.demand,r.balance]));
+ renderBom();table('slowTable',['Item Code','Description','UOM','Stock','Rate','Value','Location'],slowRows.map(r=>{const value=Number(r.value)>0?Number(r.value):(Number(r.stock)||0)*(Number(r.rate)||0);return[r.code,r.desc,r.uom,r.stock,money(r.rate),money(value),r.location]}));save();
 }
+function matches(row,fields,kind){const q=(filters[kind]||'').toLowerCase();if(!q)return true;return fields.some(f=>String(row[f]||'').toLowerCase().includes(q))}
 function table(id,heads,rows){const el=document.getElementById(id);if(!el)return;el.innerHTML='<thead><tr>'+heads.map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+(rows.length?rows.map(r=>'<tr>'+r.map(c=>'<td>'+(c??'')+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="'+heads.length+'" style="color:#9aa7c7">No records</td></tr>')+'</tbody>'}
-function renderBom(){const search=document.getElementById('bomSearch');const cost=document.getElementById('bomCost');if(!search||!cost)return;const q=String(search.value||'').toLowerCase();const rows=data.bom.filter(r=>{const parent=String(r.parent||'').toLowerCase();const child=String(r.child||'').toLowerCase();const desc=String(r.desc||'').toLowerCase();return !q||parent.includes(q)||child.includes(q)||desc.includes(q)});table('bomTable',['Parent / FG','Child Item','Description','Qty','UOM','Rate','Line Cost'],rows.map(r=>{const c=(Number(r.qty)||0)*rateOf(r.child);return[r.parent,r.child,r.desc,r.qty,r.uom,money(rateOf(r.child)),money(c)]}));cost.textContent=money(rows.reduce((s,r)=>s+(Number(r.qty)||0)*rateOf(r.child),0))}
+function renderBom(){const search=document.getElementById('bomSearch');const cost=document.getElementById('bomCost');if(!search||!cost)return;const q=String(filters.bom||search.value||'').toLowerCase();const rows=data.bom.filter(r=>{const parent=String(r.parent||'').toLowerCase();const child=String(r.child||'').toLowerCase();const desc=String(r.desc||'').toLowerCase();return !q||parent.includes(q)||child.includes(q)||desc.includes(q)});table('bomTable',['Parent / FG','Child Item','Description','Qty','UOM','Rate','Line Cost'],rows.map(r=>{const c=(Number(r.qty)||0)*rateOf(r.child);return[r.parent,r.child,r.desc,r.qty,r.uom,money(rateOf(r.child)),money(c)]}));cost.textContent=money(rows.reduce((s,r)=>s+(Number(r.qty)||0)*rateOf(r.child),0))}
 function drawChart(a,b){const c=document.getElementById('chart');if(!c||!c.getContext)return;const x=c.getContext('2d');if(!x)return;c.width=c.offsetWidth*2;c.height=440;x.scale(2,2);const w=c.offsetWidth,h=220,max=Math.max(a,b,1);x.clearRect(0,0,w,h);[[a,'#4f8cff','Inventory'],[b,'#22d3ee','Store']].forEach((d,i)=>{const bw=110,bx=80+i*220,bh=(d[0]/max)*150;x.fillStyle='rgba(255,255,255,.08)';x.fillRect(bx,40,bw,150);const g=x.createLinearGradient(0,40,0,190);g.addColorStop(0,d[1]);g.addColorStop(1,'rgba(255,255,255,.05)');x.fillStyle=g;x.fillRect(bx,190-bh,bw,bh);x.fillStyle='#fff';x.font='bold 15px Inter';x.fillText(money(d[0]),bx,30);x.fillStyle='#9aa7c7';x.font='12px Inter';x.fillText(d[2],bx,208)})}
 document.querySelectorAll('[data-clear]').forEach(b=>b.onclick=async()=>{if(confirm('Clear all '+b.dataset.clear+' records?')){data[b.dataset.clear]=[];await save();render();toast('Cleared')}});
 document.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>openModal(b.dataset.add));
 function openModal(type){const m=document.getElementById('modal');if(!m)return;document.getElementById('modalTitle').textContent='Add '+type.toUpperCase()+' Item';document.getElementById('modalFields').innerHTML=FIELDS[type].map(([k,l])=>'<input class="input" id="f_'+k+'" placeholder="'+l+'">').join('');m.classList.add('open');document.getElementById('modalSave').onclick=async()=>{const row={};FIELDS[type].forEach(([k])=>{const input=document.getElementById('f_'+k);row[k]=input?input.value:''});if(type==='slow'&&!row.rate)row.rate=0;if(type==='slow'&&!row.value)row.value=(Number(row.stock)||0)*(Number(row.rate)||0);data[type].push(row);await save();render();m.classList.remove('open');toast('Item added')}}
 const modalCancel=document.getElementById('modalCancel');if(modalCancel)modalCancel.onclick=()=>document.getElementById('modal').classList.remove('open');
-const bomSearch=document.getElementById('bomSearch');if(bomSearch)bomSearch.oninput=renderBom;
+const bomSearch=document.getElementById('bomSearch');if(bomSearch)bomSearch.addEventListener('input',()=>{filters.bom=bomSearch.value.toLowerCase();renderBom()});
 function num(v){if(v==null)return 0;const s=String(v).replace(/,/g,'').replace(/[^0-9.\-]/g,'').trim();const n=parseFloat(s);return isNaN(n)?0:n}
 function clean(s){return String(s||'').replace(/\s+/g,' ').trim()}
 function isHeaderNoise(text){const t=text.toLowerCase();return t.includes('pak elektron')||t.includes('slow moving inventory status')||t.includes('subinventory / locator wise')||t.includes('unit 2 itr')||t.includes('from locator')||t.includes('to locator')||t.includes('from date')||t.includes('to date')||t.includes('subinventory:')||t.includes('printed by')||t.includes('page ')||t.includes('inv. group')||t.includes('aging:')}
@@ -70,6 +79,7 @@ function makeColumnMap(header,aliases){
 }
 function columnValue(row,ranges,key){if(!ranges||!ranges[key])return '';let text='';(row||[]).forEach(cell=>{if(cell&&cell.x>=ranges[key].start&&cell.x<ranges[key].end)text+=' '+cell.text});return clean(text)}
 function columnNumber(row,ranges,key){return num(columnValue(row,ranges,key))}
+function fixDescription(text){let d=clean(text);d=d.replace(/\b(?:NOS|NOS\.|PCS|KGS|KG|MTR|MTRS|LTR|LTRS|SET|SETS|PAD|GLN)\b/gi,'');d=d.replace(/\s+/g,' ').trim();return d}
 const CODE_RE=/\b(?:FG|RM|CM|SS|WIP|GI|SCR)\d{2,5}(?:-\d+)*-\d{2}-\d{3}\b/i;
 const UOM_RE=/^\s*(?:NOS|NOS\.|PCS|KGS|KG|MTR|MTRS|LTR|LTRS|SET|SETS|PAD|GLN)\s*$/i;
 async function parseFile(file,kind){
@@ -82,10 +92,10 @@ async function parseFile(file,kind){
  const aliases={
   inventory:{sub:['subinventory'],locator:['locator'],code:['itemcode'],desc:['itemdescription','description'],uom:['uom'],opening:['opening'],received:['received'],issued:['issued'],closing:['closing']},
   store:{sub:['subinventory'],locator:['locator'],code:['itemcode'],desc:['itemdescription','description'],uom:['uom'],opening:['opening'],received:['received'],issued:['issued'],closing:['closing']},
-  slow:{code:['itemcode'],desc:['itemdescription'],uom:['uom'],stock:['stock'],rate:['rate'],value:['value'],location:['location']},
-  voucher:{code:['itemcode'],desc:['description'],locator:['destinationlocator'],demand:['demandqty'],balance:['balanceqty']},
-  ir:{code:['itemcode'],desc:['description'],locator:['destinationlocator'],fb:['fbnum','fbno'],serial:['serialnum','serialno'],reference:['reference'],demand:['demandqty'],balance:['balanceqty']},
-  bom:{parent:['parent','fgcode'],child:['childcode','itemcode'],desc:['description'],qty:['qty','quantity'],uom:['uom']}
+  slow:{code:['itemcode'],desc:['itemdescription','description'],uom:['uom'],stock:['stock'],rate:['rate'],value:['value'],location:['location']},
+  voucher:{code:['itemcode'],desc:['description','itemdescription'],locator:['destinationlocator'],demand:['demandqty'],balance:['balanceqty']},
+  ir:{code:['itemcode'],desc:['description','itemdescription'],locator:['destinationlocator'],fb:['fbnum','fbno'],serial:['serialnum','serialno'],reference:['reference'],demand:['demandqty'],balance:['balanceqty']},
+  bom:{parent:['parent','fgcode'],child:['childcode','itemcode'],desc:['description','itemdescription'],qty:['qty','quantity'],uom:['uom']}
  };
  let ranges=null;
  for(const row of rows){
@@ -94,24 +104,24 @@ async function parseFile(file,kind){
   const codeText=columnValue(row,ranges,'code');const code=codeText.match(CODE_RE);const itemCode=code?code[0]:codeText;
   if(!itemCode||itemCode.toLowerCase().includes('itemcode'))continue;
   if(kind==='inventory'||kind==='store'){
-   let desc=columnValue(row,ranges,'desc');const uom=columnValue(row,ranges,'uom');
+   let desc=fixDescription(columnValue(row,ranges,'desc'));const uom=columnValue(row,ranges,'uom');
    if(!uom&&UOM_RE.test(desc)){const m=desc.match(UOM_RE);desc=clean(desc.replace(m[0],''))}
    out.push({sub:columnValue(row,ranges,'sub').replace(/^'/,''),locator:columnValue(row,ranges,'locator'),code:itemCode,desc,uom:uom||'NOS',opening:columnNumber(row,ranges,'opening'),received:columnNumber(row,ranges,'received'),issued:columnNumber(row,ranges,'issued'),closing:columnNumber(row,ranges,'closing')})
-  }else if(kind==='slow'){out.push({code:itemCode,desc:columnValue(row,ranges,'desc'),uom:columnValue(row,ranges,'uom'),stock:columnNumber(row,ranges,'stock'),rate:columnNumber(row,ranges,'rate'),value:columnNumber(row,ranges,'value'),location:columnValue(row,ranges,'location')})}
-  else if(kind==='voucher'){out.push({code:itemCode,desc:columnValue(row,ranges,'desc'),locator:columnValue(row,ranges,'locator'),demand:columnNumber(row,ranges,'demand'),balance:columnNumber(row,ranges,'balance')})}
-  else if(kind==='ir'){out.push({code:itemCode,desc:columnValue(row,ranges,'desc'),locator:columnValue(row,ranges,'locator'),fb:columnValue(row,ranges,'fb'),serial:columnValue(row,ranges,'serial'),reference:columnValue(row,ranges,'reference'),demand:columnNumber(row,ranges,'demand'),balance:columnNumber(row,ranges,'balance')})}
-  else{out.push({parent:columnValue(row,ranges,'parent'),child:itemCode,desc:columnValue(row,ranges,'desc'),qty:columnNumber(row,ranges,'qty'),uom:columnValue(row,ranges,'uom')})}
+  }else if(kind==='slow'){const stock=columnNumber(row,ranges,'stock');const rate=columnNumber(row,ranges,'rate');const pdfValue=columnNumber(row,ranges,'value');out.push({code:itemCode,desc:fixDescription(columnValue(row,ranges,'desc')),uom:columnValue(row,ranges,'uom'),stock,rate,value:pdfValue>0?pdfValue:stock*rate,location:columnValue(row,ranges,'location')})}
+  else if(kind==='voucher'){out.push({code:itemCode,desc:fixDescription(columnValue(row,ranges,'desc')),locator:columnValue(row,ranges,'locator'),demand:columnNumber(row,ranges,'demand'),balance:columnNumber(row,ranges,'balance')})}
+  else if(kind==='ir'){out.push({code:itemCode,desc:fixDescription(columnValue(row,ranges,'desc')),locator:columnValue(row,ranges,'locator'),fb:columnValue(row,ranges,'fb'),serial:columnValue(row,ranges,'serial'),reference:columnValue(row,ranges,'reference'),demand:columnNumber(row,ranges,'demand'),balance:columnNumber(row,ranges,'balance')})}
+  else{out.push({parent:columnValue(row,ranges,'parent'),child:itemCode,desc:fixDescription(columnValue(row,ranges,'desc')),qty:columnNumber(row,ranges,'qty'),uom:columnValue(row,ranges,'uom')})}
  }
  if(!ranges)throw new Error('PDF header/columns not recognized. Please upload the standard Inventory/Store PDF.');
  const seen=new Set();return out.filter(r=>{const k=(r.code||r.child||'')+'|'+(r.locator||'')+'|'+(r.sub||'');if(seen.has(k))return false;seen.add(k);return true});
 }
 function normalizeExcel(kind,r){
  const get=(...names)=>{for(const n of names){for(const k in r){if(k.toLowerCase().replace(/[^a-z]/g,'').includes(n))return r[k]}}return ''};
- if(kind==='inventory'||kind==='store')return{sub:clean(get('subinventory','sub')),locator:clean(get('locator')),code:clean(get('itemcode','code')),desc:clean(get('itemdescription','description')),uom:clean(get('uom')),opening:num(get('opening')),received:num(get('received')),issued:num(get('issued')),closing:num(get('closing'))};
- if(kind==='slow')return{code:clean(get('itemcode','code')),desc:clean(get('itemdescription','description')),uom:clean(get('uom')),stock:num(get('stock','quantity')),rate:num(get('rate','cost')),value:num(get('value')),location:clean(get('location'))};
- if(kind==='voucher')return{code:clean(get('itemcode','code')),desc:clean(get('description','desc')),locator:clean(get('destinationlocator','locator')),demand:num(get('demandqty','demand')),balance:num(get('balanceqty','balance'))};
- if(kind==='ir')return{code:clean(get('itemcode','code')),desc:clean(get('description','desc')),locator:clean(get('destinationlocator','locator')),fb:clean(get('fbnum','fbno','fb')),serial:clean(get('serialnum','serialno','serial')),reference:clean(get('reference')),demand:num(get('demandqty','demand')),balance:num(get('balanceqty','balance'))};
- return{parent:clean(get('parent','fgcode','fg')),child:clean(get('childcode','itemcode','code')),desc:clean(get('description','desc')),qty:num(get('qty','quantity')),uom:clean(get('uom'))};
+ if(kind==='inventory'||kind==='store')return{sub:clean(get('subinventory','sub')),locator:clean(get('locator')),code:clean(get('itemcode','code')),desc:fixDescription(get('itemdescription','description')),uom:clean(get('uom')),opening:num(get('opening')),received:num(get('received')),issued:num(get('issued')),closing:num(get('closing'))};
+ if(kind==='slow'){const stock=num(get('stock','quantity'));const rate=num(get('rate','cost'));const value=num(get('value'));return{code:clean(get('itemcode','code')),desc:fixDescription(get('itemdescription','description')),uom:clean(get('uom')),stock,rate,value:value>0?value:stock*rate,location:clean(get('location'))}}
+ if(kind==='voucher')return{code:clean(get('itemcode','code')),desc:fixDescription(get('description','desc')),locator:clean(get('destinationlocator','locator')),demand:num(get('demandqty','demand')),balance:num(get('balanceqty','balance'))};
+ if(kind==='ir')return{code:clean(get('itemcode','code')),desc:fixDescription(get('description','desc')),locator:clean(get('destinationlocator','locator')),fb:clean(get('fbnum','fbno','fb')),serial:clean(get('serialnum','serialno','serial')),reference:clean(get('reference')),demand:num(get('demandqty','demand')),balance:num(get('balanceqty','balance'))};
+ return{parent:clean(get('parent','fgcode','fg')),child:clean(get('childcode','itemcode','code')),desc:fixDescription(get('description','desc')),qty:num(get('qty','quantity')),uom:clean(get('uom'))};
 }
 const fileMap={inventoryFile:'inventory',storeFile:'store',voucherFile:'voucher',irFile:'ir',bomFile:'bom',slowFile:'slow'};
 Object.entries(fileMap).forEach(([id,kind])=>{const input=document.getElementById(id);if(!input)return;input.onchange=async e=>{const target=e&&e.target?e.target:null;const f=target&&target.files&&target.files[0];if(!f)return;showProgress(kind,'Starting...');try{const rows=await parseFile(f,kind);if(!rows.length){failProgress(kind,'No records detected in file');return}if(kind==='voucher'){rows.forEach(r=>{const inv=data.inventory.find(x=>x.code===r.code);if(inv)inv.closing=num(inv.closing)+r.demand;const st=data.store.find(x=>x.code===r.code);if(st)st.closing=num(st.closing)-r.demand})}setProgress(kind,'Saving...',97);data[kind]=data[kind].concat(rows);await save();render();doneProgress(kind,rows.length+' imported')}catch(err){console.error('Import error:',err);failProgress(kind,'Import failed: '+(err.message||err))}finally{if(target)target.value=''}}});
