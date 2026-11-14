@@ -2,6 +2,7 @@ const FIELDS={inventory:[['sub','Sub Inventory'],['locator','Locator'],['code','
 const KEYS=['inventory','store','voucher','ir','bom','slow'];
 let data=JSON.parse(localStorage.getItem('storeOS')||'{}');KEYS.forEach(k=>data[k]=data[k]||[]);
 let firebaseApi=null,saving=false;
+if(typeof pdfjsLib!=='undefined'){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'}
 const money=n=>(Number(n)||0).toLocaleString(undefined,{maximumFractionDigits:2});
 const rateOf=code=>{const i=data.slow.find(x=>String(x.code).trim()===String(code).trim());return i?Number(i.rate)||0:0};
 const toast=m=>{const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000)};
@@ -45,7 +46,7 @@ document.getElementById('bomSearch').oninput=renderBom;
 function num(v){if(v==null)return 0;const s=String(v).replace(/,/g,'').replace(/[^0-9.\-]/g,'').trim();const n=parseFloat(s);return isNaN(n)?0:n}
 function clean(s){return String(s||'').replace(/\s+/g,' ').trim()}
 async function extractPdfRows(file){
- if(typeof pdfjsLib==='undefined')throw new Error('PDF reader not loaded');
+ if(typeof pdfjsLib==='undefined')throw new Error('PDF reader not loaded. Internet/ad-blocker check karein.');
  const buf=await file.arrayBuffer();const pdf=await pdfjsLib.getDocument({data:buf}).promise;const total=pdf.numPages;const pages=[];
  for(let p=1;p<=total;p++){setProgress('Reading '+file.name+' — page '+p+' of '+total,((p-1)/total)*90);const page=await pdf.getPage(p);const tc=await page.getTextContent();const items=tc.items.map(i=>({text:clean(i.str),x:Math.round(i.transform[4]),y:Math.round(i.transform[5])})).filter(i=>i.text);
   const rows=new Map();items.forEach(i=>{const y=Math.round(i.y/3)*3;if(!rows.has(y))rows.set(y,[]);rows.get(y).push(i)});
