@@ -129,7 +129,7 @@ async function parseFile(file,kind){
    const codeText=columnValue(row,ranges,kind==='bom'?'child':'code').replace(/\s+/g,'');
    const code=codeText.match(CODE_RE);const itemCode=code?code[0]:'';
    if(!itemCode){
-    const continuation=fixDescription(columnValue(row,ranges,'desc'));
+    const continuation=fixDescription(columnValue(row,ranges,'desc'));if(kind==='slow'){const numeric=columnNumber(row,ranges,'stock')||columnNumber(row,ranges,'rate')||columnNumber(row,ranges,'value');if(!numeric&&continuation)continuations.push({y:row._y,text:continuation});continue;}
     if(continuation)continuations.push({y:row._y,text:continuation});
     continue;
    }
