@@ -78,6 +78,14 @@ function makeColumnMap(header,aliases){
 }
 function columnValue(row,ranges,key){if(!ranges||!ranges[key])return '';let text='';(row||[]).forEach(cell=>{if(cell&&cell.x>=ranges[key].start&&cell.x<ranges[key].end)text+=' '+cell.text});return clean(text)}
 function columnNumber(row,ranges,key){return num(columnValue(row,ranges,key))}
+function rowText(row){return clean((row||[]).map(c=>c&&c.text?c.text:'').join(' '))}
+function fullDescription(row,itemCode){
+ const text=rowText(row);const codeIndex=text.toLowerCase().indexOf(String(itemCode||'').toLowerCase());if(codeIndex<0)return '';
+ let after=text.slice(codeIndex+String(itemCode).length);
+ const uom=after.match(/\b(?:NOS|NOS\.|PCS|KGS|KG|MTR|MTRS|LTR|LTRS|SET|SETS|PAD|GLN)\b/i);
+ if(uom&&uom.index>=0)after=after.slice(0,uom.index);
+ return clean(after.replace(/^[-\s]+/,''));
+}
 function fixDescription(text){let d=clean(text);d=d.replace(/\b(?:NOS|NOS\.|PCS|KGS|KG|MTR|MTRS|LTR|LTRS|SET|SETS|PAD|GLN)\b/gi,'');d=d.replace(/\s+/g,' ').trim();return d}
 const CODE_RE=/\b(?:FG|RM|CM|SS|WIP|GI|SCR)\d{2,5}(?:-\d+)*-\d{2}-\d{3}\b/i;
 const UOM_RE=/^\s*(?:NOS|NOS\.|PCS|KGS|KG|MTR|MTRS|LTR|LTRS|SET|SETS|PAD|GLN)\s*$/i;
@@ -106,14 +114,15 @@ async function parseFile(file,kind){
    if(continuation&&out.length){const last=out[out.length-1];last.desc=clean((last.desc||'')+' '+continuation)}
    continue;
   }
+  const fullDesc=fullDescription(row,itemCode);
   if(kind==='inventory'||kind==='store'){
-   let desc=fixDescription(columnValue(row,ranges,'desc'));const uom=columnValue(row,ranges,'uom');
+   let desc=fullDesc||fixDescription(columnValue(row,ranges,'desc'));const uom=columnValue(row,ranges,'uom');
    if(!uom&&UOM_RE.test(desc)){const m=desc.match(UOM_RE);desc=clean(desc.replace(m[0],''))}
    out.push({sub:columnValue(row,ranges,'sub').replace(/^'/,''),locator:columnValue(row,ranges,'locator'),code:itemCode,desc,uom:uom||'NOS',opening:columnNumber(row,ranges,'opening'),received:columnNumber(row,ranges,'received'),issued:columnNumber(row,ranges,'issued'),closing:columnNumber(row,ranges,'closing')})
-  }else if(kind==='slow'){const stock=columnNumber(row,ranges,'stock');const rate=columnNumber(row,ranges,'rate');const pdfValue=columnNumber(row,ranges,'value');out.push({code:itemCode,desc:fixDescription(columnValue(row,ranges,'desc')),uom:columnValue(row,ranges,'uom'),stock,rate,value:pdfValue>0?pdfValue:stock*rate,location:columnValue(row,ranges,'location')})}
-  else if(kind==='voucher'){out.push({code:itemCode,desc:fixDescription(columnValue(row,ranges,'desc')),locator:columnValue(row,ranges,'locator'),demand:columnNumber(row,ranges,'demand'),balance:columnNumber(row,ranges,'balance')})}
-  else if(kind==='ir'){out.push({code:itemCode,desc:fixDescription(columnValue(row,ranges,'desc')),locator:columnValue(row,ranges,'locator'),fb:columnValue(row,ranges,'fb'),serial:columnValue(row,ranges,'serial'),reference:columnValue(row,ranges,'reference'),demand:columnNumber(row,ranges,'demand'),balance:columnNumber(row,ranges,'balance')})}
-  else{out.push({parent:columnValue(row,ranges,'parent'),child:itemCode,desc:fixDescription(columnValue(row,ranges,'desc')),qty:columnNumber(row,ranges,'qty'),uom:columnValue(row,ranges,'uom')})}
+  }else if(kind==='slow'){const stock=columnNumber(row,ranges,'stock');const rate=columnNumber(row,ranges,'rate');const pdfValue=columnNumber(row,ranges,'value');out.push({code:itemCode,desc:fullDesc||fixDescription(columnValue(row,ranges,'desc')),uom:columnValue(row,ranges,'uom'),stock,rate,value:pdfValue>0?pdfValue:stock*rate,location:columnValue(row,ranges,'location')})}
+  else if(kind==='voucher'){out.push({code:itemCode,desc:fullDesc||fixDescription(columnValue(row,ranges,'desc')),locator:columnValue(row,ranges,'locator'),demand:columnNumber(row,ranges,'demand'),balance:columnNumber(row,ranges,'balance')})}
+  else if(kind==='ir'){out.push({code:itemCode,desc:fullDesc||fixDescription(columnValue(row,ranges,'desc')),locator:columnValue(row,ranges,'locator'),fb:columnValue(row,ranges,'fb'),serial:columnValue(row,ranges,'serial'),reference:columnValue(row,ranges,'reference'),demand:columnNumber(row,ranges,'demand'),balance:columnNumber(row,ranges,'balance')})}
+  else{out.push({parent:columnValue(row,ranges,'parent'),child:itemCode,desc:fullDesc||fixDescription(columnValue(row,ranges,'desc')),qty:columnNumber(row,ranges,'qty'),uom:columnValue(row,ranges,'uom')})}
  }
  if(!ranges)throw new Error('PDF header/columns not recognized. Please upload the standard Inventory/Store PDF.');
  const seen=new Set();return out.filter(r=>{const k=(r.code||r.child||'')+'|'+(r.locator||'')+'|'+(r.sub||'');if(seen.has(k))return false;seen.add(k);return true});
