@@ -1,0 +1,38 @@
+name: Exclude FG cost from dashboard
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/exclude-fg-dashboard.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exclude FG rows only from dashboard costs
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('js/app.js')
+          s = p.read_text()
+          for kind, total in [('inventory', 'invTotal'), ('store', 'storeTotal')]:
+              old = f'const {total}=data.{kind}.reduce((s,r)=>s+(Number(r.closing)||0)*rateOf(r.code),0);'
+              new = f'const {total}=data.{kind}.filter(r=>!String(r.code||\"\").trim().toUpperCase().startsWith(\"FG\")).reduce((s,r)=>s+(Number(r.closing)||0)*rateOf(r.code),0);'.replace('\"', '"')
+              assert s.count(old) == 1, 'Dashboard calculation changed; refusing unsafe patch'
+              s = s.replace(old, new, 1)
+          p.write_text(s)
+          p = Path('index.html')
+          s = p.read_text()
+          old = 'js/app.js?v=description-2'
+          assert s.count(old) == 1, 'Entry point changed; refusing unsafe patch'
+          p.write_text(s.replace(old, 'js/app.js?v=exclude-fg-1', 1))
+      - name: Check JavaScript syntax
+        run: node --check js/app.js
+      - name: Commit patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add js/app.js index.html
+          git diff --cached --quiet || (git commit -m 'Exclude FG item costs from dashboard totals and chart' && git push)
