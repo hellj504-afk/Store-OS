@@ -4,7 +4,7 @@ let data=JSON.parse(localStorage.getItem('storeOS')||'{}');KEYS.forEach(k=>data[
 let firebaseApi=null,saving=false;
 if(typeof pdfjsLib!=='undefined'){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'}
 const money=n=>(Number(n)||0).toLocaleString(undefined,{maximumFractionDigits:2});
-const rateOf=code=>{const i=data.slow.find(x=>String(x.code).trim()===String(code).trim());return i?Number(i.rate)||0:0};
+const rateOf=code=>{const i=data.slow.find(x=>String(x.code||'').trim()===String(code||'').trim());return i?Number(i.rate)||0:0};
 const toast=m=>{const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000)};
 const progress={wrap:document.getElementById('progressWrap'),bar:document.getElementById('progressBar'),text:document.getElementById('progressText'),percent:document.getElementById('progressPercent')};
 function showProgress(text){progress.wrap.classList.add('show');progress.bar.className='progress-bar';progress.bar.style.width='0%';progress.percent.textContent='0%';progress.text.textContent=text}
@@ -36,7 +36,7 @@ function render(){
  renderBom();table('slowTable',['Item Code','Description','UOM','Stock','Rate','Value','Location'],data.slow.map(r=>[r.code,r.desc,r.uom,r.stock,money(r.rate),money(r.value),r.location]));save();
 }
 function table(id,heads,rows){const el=document.getElementById(id);el.innerHTML='<thead><tr>'+heads.map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+(rows.length?rows.map(r=>'<tr>'+r.map(c=>'<td>'+(c??'')+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="'+heads.length+'" style="color:#9aa7c7">No records</td></tr>')+'</tbody>'}
-function renderBom(){const q=(document.getElementById('bomSearch').value||'').toLowerCase();const rows=data.bom.filter(r=>!q||String(r.parent).toLowerCase().includes(q)||String(r.child).toLowerCase().includes(q)||String(r.desc).toLowerCase().includes(q));table('bomTable',['Parent / FG','Child Item','Description','Qty','UOM','Rate','Line Cost'],rows.map(r=>{const c=(Number(r.qty)||0)*rateOf(r.child);return[r.parent,r.child,r.desc,r.qty,r.uom,money(rateOf(r.child)),money(c)]}));document.getElementById('bomCost').textContent=money(rows.reduce((s,r)=>s+(Number(r.qty)||0)*rateOf(r.child),0))}
+function renderBom(){const q=String(document.getElementById('bomSearch').value||'').toLowerCase();const rows=data.bom.filter(r=>{const parent=String(r.parent||'').toLowerCase();const child=String(r.child||'').toLowerCase();const desc=String(r.desc||'').toLowerCase();return !q||parent.includes(q)||child.includes(q)||desc.includes(q)});table('bomTable',['Parent / FG','Child Item','Description','Qty','UOM','Rate','Line Cost'],rows.map(r=>{const c=(Number(r.qty)||0)*rateOf(r.child);return[r.parent,r.child,r.desc,r.qty,r.uom,money(rateOf(r.child)),money(c)]}));document.getElementById('bomCost').textContent=money(rows.reduce((s,r)=>s+(Number(r.qty)||0)*rateOf(r.child),0))}
 function drawChart(a,b){const c=document.getElementById('chart'),x=c.getContext('2d');c.width=c.offsetWidth*2;c.height=440;x.scale(2,2);const w=c.offsetWidth,h=220,max=Math.max(a,b,1);x.clearRect(0,0,w,h);[[a,'#4f8cff','Inventory'],[b,'#22d3ee','Store']].forEach((d,i)=>{const bw=110,bx=80+i*220,bh=(d[0]/max)*150;x.fillStyle='rgba(255,255,255,.08)';x.fillRect(bx,40,bw,150);const g=x.createLinearGradient(0,40,0,190);g.addColorStop(0,d[1]);g.addColorStop(1,'rgba(255,255,255,.05)');x.fillStyle=g;x.fillRect(bx,190-bh,bw,bh);x.fillStyle='#fff';x.font='bold 15px Inter';x.fillText(money(d[0]),bx,30);x.fillStyle='#9aa7c7';x.font='12px Inter';x.fillText(d[2],bx,208)})}
 document.querySelectorAll('[data-clear]').forEach(b=>b.onclick=async()=>{if(confirm('Clear all '+b.dataset.clear+' records?')){data[b.dataset.clear]=[];await save();render();toast('Cleared')}});
 document.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>openModal(b.dataset.add));
@@ -84,7 +84,7 @@ async function parseFile(file,kind){
    else out.push({parent:cellAt(row,h.parent),child:itemCode,desc:cellAt(row,h.desc),qty:numberAt(row,h.qty),uom:cellAt(row,h.uom)});
   }
  }
- const seen=new Set();return out.filter(r=>{const k=(r.code||r.child)+'|'+(r.locator||'')+'|'+(r.sub||'');if(seen.has(k))return false;seen.add(k);return true});
+ const seen=new Set();return out.filter(r=>{const k=(r.code||r.child||'')+'|'+(r.locator||'')+'|'+(r.sub||'');if(seen.has(k))return false;seen.add(k);return true});
 }
 function normalizeExcel(kind,r){
  const get=(...names)=>{for(const n of names){for(const k in r){if(k.toLowerCase().replace(/[^a-z]/g,'').includes(n))return r[k]}}return ''};
