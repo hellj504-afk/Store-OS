@@ -68,7 +68,7 @@ function makeColumnMap(header,aliases){
  entries.forEach(([key,cell],i)=>{const next=entries[i+1];ranges[key]={start:cell.x-8,end:next?next[1].x-8:99999}});
  return ranges;
 }
-function columnValue(row,ranges,key){const range=ranges[key];if(!range)return '';let text='';(row||[]).forEach(cell=>{if(cell&&cell.x>=range.start&&cell.x<range.end)text+=' '+cell.text});return clean(text)}
+function columnValue(row,ranges,key){if(!ranges||!ranges[key])return '';let text='';(row||[]).forEach(cell=>{if(cell&&cell.x>=ranges[key].start&&cell.x<ranges[key].end)text+=' '+cell.text});return clean(text)}
 function columnNumber(row,ranges,key){return num(columnValue(row,ranges,key))}
 const CODE_RE=/\b(?:FG|RM|CM|SS|WIP|GI|SCR)\d{2,5}(?:-\d+)*-\d{2}-\d{3}\b/i;
 const UOM_RE=/^\s*(?:NOS|NOS\.|PCS|KGS|KG|MTR|MTRS|LTR|LTRS|SET|SETS|PAD|GLN)\s*$/i;
@@ -90,6 +90,7 @@ async function parseFile(file,kind){
  let ranges=null;
  for(const row of rows){
   if(!ranges){const candidate=makeColumnMap(row,aliases[kind]);if(Object.keys(candidate).length>=5){ranges=candidate;continue}}
+  if(!ranges)continue;
   const codeText=columnValue(row,ranges,'code');const code=codeText.match(CODE_RE);const itemCode=code?code[0]:codeText;
   if(!itemCode||itemCode.toLowerCase().includes('itemcode'))continue;
   if(kind==='inventory'||kind==='store'){
@@ -101,6 +102,7 @@ async function parseFile(file,kind){
   else if(kind==='ir'){out.push({code:itemCode,desc:columnValue(row,ranges,'desc'),locator:columnValue(row,ranges,'locator'),fb:columnValue(row,ranges,'fb'),serial:columnValue(row,ranges,'serial'),reference:columnValue(row,ranges,'reference'),demand:columnNumber(row,ranges,'demand'),balance:columnNumber(row,ranges,'balance')})}
   else{out.push({parent:columnValue(row,ranges,'parent'),child:itemCode,desc:columnValue(row,ranges,'desc'),qty:columnNumber(row,ranges,'qty'),uom:columnValue(row,ranges,'uom')})}
  }
+ if(!ranges)throw new Error('PDF header/columns not recognized. Please upload the standard Inventory/Store PDF.');
  const seen=new Set();return out.filter(r=>{const k=(r.code||r.child||'')+'|'+(r.locator||'')+'|'+(r.sub||'');if(seen.has(k))return false;seen.add(k);return true});
 }
 function normalizeExcel(kind,r){
