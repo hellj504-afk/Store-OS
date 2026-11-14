@@ -61,7 +61,7 @@ function parseInventoryRow(row,h){
  const code=cellAt(row,h.code).match(CODE_RE);const itemCode=code?code[0]:cellAt(row,h.code);
  if(!itemCode||itemCode.toLowerCase().includes('itemcode'))return null;
  const nums=[];for(let i=h.opening;i<=h.closing;i++)nums.push(numberAt(row,i));
- return{sub:cellAt(row,h.sub).replace(/^'/,''),locator:cellAt(row,h.locator),code:itemCode,desc:cellAt(row,h.desc),uom:cellAt(row,h.uom),opening:nums[0]||0,received:nums[1]||0,issued:nums[2]||0,closing:nums[3]??nums[0]||0};
+ return{sub:cellAt(row,h.sub).replace(/^'/,''),locator:cellAt(row,h.locator),code:itemCode,desc:cellAt(row,h.desc),uom:cellAt(row,h.uom),opening:nums[0]||0,received:nums[1]||0,issued:nums[2]||0,closing:nums[3] ?? (nums[0] || 0)};
 }
 async function parseFile(file,kind){
  if(!file.name.toLowerCase().endsWith('.pdf')){
