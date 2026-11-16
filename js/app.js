@@ -5,6 +5,17 @@ let firebaseApi=null,saving=false;const filters={inventory:'',store:'',voucher:'
 let lowStockSearchText='',lowStockFilter='all',currentLowStockRows=[];
 if(typeof pdfjsLib!=='undefined'){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'}
 const money=n=>new Intl.NumberFormat('en-US',{notation:'compact',compactDisplay:'short',maximumFractionDigits:2}).format(Number(n)||0);
+const dashboardMoney=n=>{
+ const value=Math.round(Number(n)||0);
+ const abs=Math.abs(value),parts=[];
+ const crore=Math.floor(abs/10000000),lakh=Math.floor((abs%10000000)/100000),thousand=Math.floor((abs%100000)/1000),rest=abs%1000;
+ if(crore)parts.push(crore+' Crore');
+ if(lakh)parts.push(lakh+' Lakh');
+ if(thousand)parts.push(thousand+' Hazaar');
+ if(rest||!parts.length)parts.push(String(rest));
+ const digits=new Intl.NumberFormat('en-IN',{maximumFractionDigits:0}).format(value);
+ return 'Rs '+(value<0?'-':'')+parts.join(' ')+' ('+digits+')';
+};
 const rateOf=code=>{const i=data.slow.find(x=>String(x.code||'').trim()===String(code||'').trim());return i?Number(i.rate)||0:0};
 const toast=m=>{const t=document.getElementById('toast');if(!t)return;t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000)};
 function buttonProgress(kind,text,pct){const el=document.getElementById(kind+'Progress');if(el)el.textContent=text?pct+'%':''}
@@ -29,7 +40,7 @@ function render(){
  const invTotal=data.inventory.filter(r=>!String(r.code||"").trim().toUpperCase().startsWith("FG")).reduce((s,r)=>s+(Number(r.closing)||0)*rateOf(r.code),0);
  const storeTotal=data.store.filter(r=>!String(r.code||"").trim().toUpperCase().startsWith("FG")).reduce((s,r)=>s+(Number(r.closing)||0)*rateOf(r.code),0);
  const invTotalEl=document.getElementById('invTotal');const storeTotalEl=document.getElementById('storeTotal');const itemTotalEl=document.getElementById('itemTotal');
- if(invTotalEl)invTotalEl.textContent=money(invTotal);if(storeTotalEl)storeTotalEl.textContent=money(storeTotal);if(itemTotalEl)itemTotalEl.textContent=data.inventory.length+data.store.length;
+ if(invTotalEl)invTotalEl.textContent=dashboardMoney(invTotal);if(storeTotalEl)storeTotalEl.textContent=dashboardMoney(storeTotal);if(itemTotalEl)itemTotalEl.textContent=data.inventory.length+data.store.length;
  drawChart(invTotal,storeTotal);
  const invRows=data.inventory.filter(r=>matches(r,['sub','locator','code','desc'],'inventory'));
  const storeRows=data.store.filter(r=>matches(r,['sub','locator','code','desc'],'store'));
