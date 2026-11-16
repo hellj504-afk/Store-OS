@@ -22,3 +22,34 @@ h2{margin:10px 0 18px;font-size:26px}.note{color:var(--muted);font-size:13px;mar
 .modal{position:fixed;inset:0;display:none;place-items:center;z-index:50;background:rgba(3,7,18,.65);backdrop-filter:blur(6px)}.modal.open{display:grid}.modal-box{width:min(520px,94vw);padding:24px;animation:pop .3s ease}@keyframes pop{from{opacity:0;transform:scale(.9)}}.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:8px}
 .toast{position:fixed;right:20px;bottom:20px;padding:13px 18px;border-radius:14px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.4);color:#bbf7d0;opacity:0;transform:translateY(20px);transition:.3s;z-index:60}.toast.show{opacity:1;transform:none}
 @media(max-width:760px){.topbar{position:static}.brand h1{font-size:17px}.card p{font-size:24px}}
+
+/* LIGHT THEME OVERRIDES */
+:root{color-scheme:light;--bg:#f4f7fb;--glass:rgba(255,255,255,.92);--line:#e2e8f0;--text:#172033;--muted:#64748b;--blue:#2563eb;--cyan:#0891b2;--green:#16a34a;--red:#dc2626}
+body{background:linear-gradient(135deg,#f8fafc 0%,#eef4fb 55%,#f5f7ff 100%);color:var(--text)}
+.bg-orbs span{opacity:.10;filter:blur(100px)}
+.glass{background:rgba(255,255,255,.88);border:1px solid #e2e8f0;box-shadow:0 8px 28px rgba(15,23,42,.07);backdrop-filter:blur(14px)}
+.topbar{background:rgba(255,255,255,.94)}
+.brand p{color:#64748b}
+.nav-btn{color:#475569}
+.nav-btn:hover{color:#1e293b;background:#f1f5f9}
+.nav-btn.active{color:#1d4ed8;background:#eff6ff;border-color:#bfdbfe;box-shadow:none}
+h2{color:#172033}
+.note{color:#64748b}
+.card h3{color:#64748b}
+.card p{background:none;color:#1d4ed8;-webkit-text-fill-color:#1d4ed8}
+.file-btn{color:#fff;background:linear-gradient(135deg,#2563eb,#0891b2)}
+.btn.primary{color:#fff;background:linear-gradient(135deg,#2563eb,#0891b2)}
+.btn.danger{color:#fff;background:linear-gradient(135deg,#dc2626,#ea580c)}
+.btn.ghost{background:#eef2f7;color:#334155;border:1px solid #dbe3ee}
+.input,select{background:#fff;color:#172033;border:1px solid #cbd5e1}
+.input::placeholder{color:#94a3b8}
+.input:focus{border-color:#60a5fa;box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+th{color:#475569;background:#f1f5f9}
+th,td{border-bottom:1px solid #e2e8f0}
+tr:hover td{background:#f8fbff}
+.bom-total{color:#334155}.bom-total strong{color:#1d4ed8}
+.modal{background:rgba(15,23,42,.28)}
+.modal-box{background:#fff;color:#172033}
+.toast{background:#ecfdf5;border:1px solid #86efac;color:#166534}
+#lowStockTable .lowstock-delete{background:#fee2e2;color:#b91c1c}
+#lowStockTable .lowstock-status{color:#b45309}
