@@ -6,15 +6,14 @@ let lowStockSearchText='',lowStockFilter='all',currentLowStockRows=[];
 if(typeof pdfjsLib!=='undefined'){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'}
 const money=n=>new Intl.NumberFormat('en-US',{notation:'compact',compactDisplay:'short',maximumFractionDigits:2}).format(Number(n)||0);
 const dashboardMoney=n=>{
- const value=Math.round(Number(n)||0);
- const abs=Math.abs(value),parts=[];
- const crore=Math.floor(abs/10000000),lakh=Math.floor((abs%10000000)/100000),thousand=Math.floor((abs%100000)/1000),rest=abs%1000;
- if(crore)parts.push(crore+' Crore');
- if(lakh)parts.push(lakh+' Lakh');
- if(thousand)parts.push(thousand+' Hazaar');
- if(rest||!parts.length)parts.push(String(rest));
- const digits=new Intl.NumberFormat('en-IN',{maximumFractionDigits:0}).format(value);
- return 'Rs '+(value<0?'-':'')+parts.join(' ')+' ('+digits+')';
+ const value=Number(n)||0,abs=Math.abs(value);
+ const million=abs/1000000,lakh=abs/100000;
+ const digits=new Intl.NumberFormat('en-US',{maximumFractionDigits:0}).format(Math.round(value));
+ const sign=value<0?'-':'';
+ const clean=v=>v.toFixed(2).replace(/\.?0+$/,'');
+ const compact=abs>=1000000?clean(million)+' Million':abs>=100000?clean(lakh)+' Lac':new Intl.NumberFormat('en-US',{maximumFractionDigits:0}).format(abs);
+ const alternate=abs>=1000000?clean(lakh)+' Lac':abs>=100000?clean(million)+' Million':'';
+ return 'Rs '+sign+compact+(alternate?' / '+alternate:'')+' ('+digits+')';
 };
 const rateOf=code=>{const i=data.slow.find(x=>String(x.code||'').trim()===String(code||'').trim());return i?Number(i.rate)||0:0};
 const toast=m=>{const t=document.getElementById('toast');if(!t)return;t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000)};
