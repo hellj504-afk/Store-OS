@@ -6,7 +6,7 @@
 <title>Store OS — Inventory Management System</title>
 <meta name="description" content="Store OS — Inventory, Store, Vouchers, IR/Move Orders, BOM and Slow Moving cost management.">
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="css/style.css?v=bottom-neon-nav-1">
+<link rel="stylesheet" href="css/style.css?v=bottom-nav-fixed-2">
 <link rel="stylesheet" href="css/progress.css?v=light-1">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -18,17 +18,18 @@
 
 <header class="glass topbar">
   <div class="brand"><div class="logo">S</div><div><h1>Store OS</h1><p>Inventory Management System</p></div></div>
-  <nav>
-    <button class="nav-btn active" data-view="dashboard">Dashboard</button>
-    <button class="nav-btn" data-view="inventory">Floor Inventory</button>
-    <button class="nav-btn" data-view="store">Store</button>
-    <button class="nav-btn" data-view="voucher">Issue Voucher</button>
-    <button class="nav-btn" data-view="ir">IR / Move Order</button>
-    <button class="nav-btn" data-view="bom">BOM</button>
-    <button class="nav-btn" data-view="slow">Slow Moving</button>
-    <button class="nav-btn" data-view="lowstock">Low Stock</button>
-  </nav>
 </header>
+
+<nav class="bottom-nav" aria-label="Main sections">
+  <button class="nav-btn active" data-view="dashboard">Dashboard</button>
+  <button class="nav-btn" data-view="inventory">Floor Inventory</button>
+  <button class="nav-btn" data-view="store">Store</button>
+  <button class="nav-btn" data-view="voucher">Issue Voucher</button>
+  <button class="nav-btn" data-view="ir">IR / Move Order</button>
+  <button class="nav-btn" data-view="bom">BOM</button>
+  <button class="nav-btn" data-view="slow">Slow Moving</button>
+  <button class="nav-btn" data-view="lowstock">Low Stock</button>
+</nav>
 
 <main>
 <section id="dashboard" class="view active">
