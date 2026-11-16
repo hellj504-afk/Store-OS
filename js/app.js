@@ -87,15 +87,18 @@ function renderBom(){const search=document.getElementById('bomSearch');const cos
 function drawChart(){
  const c=document.getElementById('chart');if(!c||!c.getContext)return;const x=c.getContext('2d');if(!x)return;
  const invMap=new Map(),storeMap=new Map();
- data.inventory.filter(r=>!String(r.code||'').trim().toUpperCase().startsWith('FG')).forEach(r=>{const code=String(r.code||'Unknown');invMap.set(code,(invMap.get(code)||0)+(Number(r.closing)||0)*rateOf(code))});
- data.store.filter(r=>!String(r.code||'').trim().toUpperCase().startsWith('FG')).forEach(r=>{const code=String(r.code||'Unknown');storeMap.set(code,(storeMap.get(code)||0)+(Number(r.closing)||0)*rateOf(code))});
- const labels=[...new Set([...invMap.keys(),...storeMap.keys()])].sort().slice(0,12),inv=labels.map(k=>(invMap.get(k)||0)/1e6),sto=labels.map(k=>(storeMap.get(k)||0)/1e6);
- const w=Math.max(c.clientWidth,320),h=260,dpr=window.devicePixelRatio||1;c.width=w*dpr;c.height=h*dpr;x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,w,h);
- const left=52,right=18,top=24,bottom=55,pw=w-left-right,ph=h-top-bottom,max=Math.max(1,...inv,...sto);x.strokeStyle='#d8dee9';x.lineWidth=1;x.fillStyle='#64748b';x.font='11px Inter, sans-serif';
- for(let i=0;i<=4;i++){const y=top+ph*i/4;x.beginPath();x.moveTo(left,y);x.lineTo(w-right,y);x.stroke();x.fillText((max*(1-i/4)).toFixed(1)+'M',6,y+4)}
- const draw=(values,color)=>{if(!values.length)return;x.strokeStyle=color;x.lineWidth=2.5;x.beginPath();values.forEach((v,i)=>{const px=left+(labels.length<2?pw/2:pw*i/(labels.length-1)),py=top+ph-(v/max)*ph;i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke();values.forEach((v,i)=>{const px=left+(labels.length<2?pw/2:pw*i/(labels.length-1)),py=top+ph-(v/max)*ph;x.fillStyle=color;x.beginPath();x.arc(px,py,3.5,0,Math.PI*2);x.fill()})};draw(inv,'#2563eb');draw(sto,'#0891b2');
- const step=Math.max(1,Math.ceil(labels.length/6));labels.forEach((label,i)=>{if(i%step===0){const px=left+(labels.length<2?pw/2:pw*i/(labels.length-1));x.save();x.translate(px,h-8);x.rotate(-.35);x.fillStyle='#64748b';x.font='10px Inter, sans-serif';x.fillText(label.slice(0,14),0,0);x.restore()}});
- x.fillStyle='#2563eb';x.fillRect(left,7,10,3);x.fillStyle='#475569';x.fillText('Inventory',left+15,12);x.fillStyle='#0891b2';x.fillRect(left+95,7,10,3);x.fillStyle='#475569';x.fillText('Store',left+110,12);
+ data.inventory.forEach(r=>{const code=String(r.code||'').trim();if(code)invMap.set(code,(invMap.get(code)||0)+num(r.closing))});
+ data.store.forEach(r=>{const code=String(r.code||'').trim();if(code)storeMap.set(code,(storeMap.get(code)||0)+num(r.closing))});
+ const codes=[...new Set([...invMap.keys(),...storeMap.keys()])].sort();
+ const inv=codes.map(k=>invMap.get(k)||0),sto=codes.map(k=>storeMap.get(k)||0);
+ const w=Math.max(c.clientWidth,320),h=280,dpr=window.devicePixelRatio||1;c.width=w*dpr;c.height=h*dpr;x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,w,h);
+ const left=48,right=14,top=32,bottom=38,pw=w-left-right,ph=h-top-bottom,max=Math.max(1,...inv,...sto);
+ x.font='11px Inter,sans-serif';x.textAlign='right';x.textBaseline='middle';
+ for(let i=0;i<=4;i++){const y=top+ph*i/4;x.strokeStyle='rgba(148,163,184,.25)';x.lineWidth=1;x.beginPath();x.moveTo(left,y);x.lineTo(w-right,y);x.stroke();x.fillStyle='#64748b';x.fillText(Math.round(max*(1-i/4)).toLocaleString('en-US'),left-8,y)}
+ const draw=(values,color)=>{if(!values.length)return;x.save();x.shadowColor=color;x.shadowBlur=14;x.strokeStyle=color;x.lineWidth=2.5;x.lineJoin='round';x.lineCap='round';x.beginPath();values.forEach((v,i)=>{const px=left+(values.length<2?pw/2:pw*i/(values.length-1)),py=top+ph-(v/max)*ph;i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke();x.shadowBlur=0;values.forEach((v,i)=>{const px=left+(values.length<2?pw/2:pw*i/(values.length-1)),py=top+ph-(v/max)*ph;x.fillStyle=color;x.beginPath();x.arc(px,py,2.5,0,Math.PI*2);x.fill()});x.restore()};
+ draw(inv,'#2563eb');draw(sto,'#06b6d4');
+ x.textAlign='left';x.textBaseline='alphabetic';x.font='12px Inter,sans-serif';x.shadowBlur=10;x.shadowColor='#2563eb';x.fillStyle='#2563eb';x.fillText('Inventory',left,18);x.shadowColor='#06b6d4';x.fillStyle='#06b6d4';x.fillText('Store',left+88,18);x.shadowBlur=0;
+ if(codes.length){x.fillStyle='#64748b';x.font='10px Inter,sans-serif';x.textAlign='center';x.fillText('All items ('+codes.length+')',left+pw/2,h-8)}
 }
 function makeColumnMap(header,aliases){
  const cols={};(header||[]).forEach((cell,i)=>{if(!cell)return;const t=cell.text.toLowerCase().replace(/[^a-z]/g,'');for(const[key,keys]of Object.entries(aliases)){if(!cols[key]&&keys.some(k=>t===k||t.includes(k)))cols[key]={index:i,x:cell.x}}});
