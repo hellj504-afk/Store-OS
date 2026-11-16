@@ -34,7 +34,7 @@ function render(){
  const invTotal=data.inventory.filter(r=>!String(r.code||"").trim().toUpperCase().startsWith("FG")).reduce((s,r)=>s+(Number(r.closing)||0)*rateOf(r.code),0);
  const storeTotal=data.store.filter(r=>!String(r.code||"").trim().toUpperCase().startsWith("FG")).reduce((s,r)=>s+(Number(r.closing)||0)*rateOf(r.code),0);
  const invTotalEl=document.getElementById('invTotal');const storeTotalEl=document.getElementById('storeTotal');const itemTotalEl=document.getElementById('itemTotal');
- if(invTotalEl)invTotalEl.textContent=dashboardMoney(invTotal);if(storeTotalEl)storeTotalEl.textContent=dashboardMoney(storeTotal);if(itemTotalEl)itemTotalEl.textContent=data.inventory.length+data.store.length;
+ if(invTotalEl)invTotalEl.textContent=dashboardMoney(invTotal);if(storeTotalEl)storeTotalEl.textContent=dashboardMoney(storeTotal);const invCountEl=document.getElementById('inventoryItemTotal');const storeCountEl=document.getElementById('storeItemTotal');const uniqueCount=rows=>new Set(rows.map(r=>String(r.code||'').trim().toUpperCase()).filter(Boolean)).size;if(invCountEl)invCountEl.textContent=uniqueCount(data.inventory);if(storeCountEl)storeCountEl.textContent=uniqueCount(data.store);
  drawChart();
  const invRows=data.inventory.filter(r=>matches(r,['sub','locator','code','desc'],'inventory'));
  const storeRows=data.store.filter(r=>matches(r,['sub','locator','code','desc'],'store'));
@@ -91,14 +91,14 @@ function drawChart(){
  data.store.forEach(r=>{const code=String(r.code||'').trim();if(code)storeMap.set(code,(storeMap.get(code)||0)+num(r.closing))});
  const codes=[...new Set([...invMap.keys(),...storeMap.keys()])].sort();
  const inv=codes.map(k=>invMap.get(k)||0),sto=codes.map(k=>storeMap.get(k)||0);
- const w=Math.max(c.clientWidth,320),h=280,dpr=window.devicePixelRatio||1;c.width=w*dpr;c.height=h*dpr;x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,w,h);
- const left=48,right=14,top=32,bottom=38,pw=w-left-right,ph=h-top-bottom,max=Math.max(1,...inv,...sto);
+ const w=Math.max(1,c.clientWidth),h=280,dpr=window.devicePixelRatio||1;c.width=w*dpr;c.height=h*dpr;x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,w,h);
+ const left=42,right=8,top=30,bottom=12,pw=Math.max(1,w-left-right),ph=h-top-bottom,max=Math.max(1,...inv,...sto);
  x.font='11px Inter,sans-serif';x.textAlign='right';x.textBaseline='middle';
  for(let i=0;i<=4;i++){const y=top+ph*i/4;x.strokeStyle='rgba(148,163,184,.25)';x.lineWidth=1;x.beginPath();x.moveTo(left,y);x.lineTo(w-right,y);x.stroke();x.fillStyle='#64748b';x.fillText(Math.round(max*(1-i/4)).toLocaleString('en-US'),left-8,y)}
  const draw=(values,color)=>{if(!values.length)return;x.save();x.shadowColor=color;x.shadowBlur=14;x.strokeStyle=color;x.lineWidth=2.5;x.lineJoin='round';x.lineCap='round';x.beginPath();values.forEach((v,i)=>{const px=left+(values.length<2?pw/2:pw*i/(values.length-1)),py=top+ph-(v/max)*ph;i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke();x.shadowBlur=0;values.forEach((v,i)=>{const px=left+(values.length<2?pw/2:pw*i/(values.length-1)),py=top+ph-(v/max)*ph;x.fillStyle=color;x.beginPath();x.arc(px,py,2.5,0,Math.PI*2);x.fill()});x.restore()};
  draw(inv,'#2563eb');draw(sto,'#06b6d4');
  x.textAlign='left';x.textBaseline='alphabetic';x.font='12px Inter,sans-serif';x.shadowBlur=10;x.shadowColor='#2563eb';x.fillStyle='#2563eb';x.fillText('Inventory',left,18);x.shadowColor='#06b6d4';x.fillStyle='#06b6d4';x.fillText('Store',left+88,18);x.shadowBlur=0;
- if(codes.length){x.fillStyle='#64748b';x.font='10px Inter,sans-serif';x.textAlign='center';x.fillText('All items ('+codes.length+')',left+pw/2,h-8)}
+ if(codes.length){x.fillStyle='#64748b';x.font='10px Inter,sans-serif';x.textAlign='center';x.fillText('All items: '+codes.length,left+pw/2,h-2)}
 }
 function makeColumnMap(header,aliases){
  const cols={};(header||[]).forEach((cell,i)=>{if(!cell)return;const t=cell.text.toLowerCase().replace(/[^a-z]/g,'');for(const[key,keys]of Object.entries(aliases)){if(!cols[key]&&keys.some(k=>t===k||t.includes(k)))cols[key]={index:i,x:cell.x}}});
