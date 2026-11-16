@@ -5,7 +5,10 @@ let firebaseApi=null,saving=false;const filters={inventory:'',store:'',voucher:'
 let lowStockSearchText='',lowStockFilter='all',currentLowStockRows=[];
 if(typeof pdfjsLib!=='undefined'){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'}
 const money=n=>new Intl.NumberFormat('en-US',{notation:'compact',compactDisplay:'short',maximumFractionDigits:2}).format(Number(n)||0);
-const dashboardMoney=n=>{\n const value=Number(n)||0;\n return String(Number((value/1000000).toFixed(2)))+' Million';\n};
+const dashboardMoney=n=>{
+ const value=Number(n)||0;
+ return String(Number((value/1000000).toFixed(2)))+' Million';
+};
 const rateOf=code=>{const i=data.slow.find(x=>String(x.code||'').trim()===String(code||'').trim());return i?Number(i.rate)||0:0};
 const toast=m=>{const t=document.getElementById('toast');if(!t)return;t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000)};
 function buttonProgress(kind,text,pct){const el=document.getElementById(kind+'Progress');if(el)el.textContent=text?pct+'%':''}
