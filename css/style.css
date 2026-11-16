@@ -180,3 +180,28 @@ nav{gap:8px;align-items:center}
 @media(prefers-reduced-motion:reduce){
   .topbar .nav-btn,.btn,.file-btn{animation:none!important}
 }
+
+
+/* Fixed bottom navigation: moved outside header to avoid transformed-parent issues */
+.bottom-nav{
+ position:fixed!important;left:50%!important;right:auto!important;
+ bottom:calc(14px + env(safe-area-inset-bottom, 0px))!important;
+ top:auto!important;transform:translateX(-50%)!important;
+ z-index:9999!important;display:flex!important;align-items:center;gap:6px;
+ width:max-content;max-width:calc(100vw - 20px);padding:8px;
+ flex-wrap:nowrap!important;overflow-x:auto;overflow-y:hidden;
+ border:1px solid rgba(255,255,255,.92);border-radius:999px;
+ background:rgba(235,248,255,.82);
+ -webkit-backdrop-filter:blur(26px) saturate(190%);
+ backdrop-filter:blur(26px) saturate(190%);
+ box-shadow:0 10px 34px rgba(15,75,110,.20),0 0 18px rgba(34,211,238,.12),inset 0 1px 2px rgba(255,255,255,.98);
+ scrollbar-width:none;
+}
+.bottom-nav::-webkit-scrollbar{display:none}
+.bottom-nav .nav-btn{flex:0 0 auto;white-space:nowrap;animation:navNeonBreath 3.8s ease-in-out infinite}
+.bottom-nav .nav-btn.active{color:#244c61;background:rgba(255,255,255,.78);border-color:#fff;box-shadow:0 0 8px rgba(34,211,238,.42),0 0 18px rgba(56,189,248,.25),inset 0 1px 2px #fff}
+body{padding-bottom:120px!important}
+@media(max-width:760px){
+ .bottom-nav{width:calc(100vw - 20px);max-width:calc(100vw - 20px);justify-content:flex-start;padding:8px 7px}
+ .bottom-nav .nav-btn{padding:10px 13px;font-size:12px}
+}
