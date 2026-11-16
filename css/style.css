@@ -53,3 +53,68 @@ tr:hover td{background:#f8fbff}
 .toast{background:#ecfdf5;border:1px solid #86efac;color:#166534}
 #lowStockTable .lowstock-delete{background:#fee2e2;color:#b91c1c}
 #lowStockTable .lowstock-status{color:#b45309}
+
+
+/* Soft floating glass + water-drop interaction theme */
+.topbar{
+ border-radius:28px;
+ background:rgba(255,255,255,.78);
+ border:1px solid rgba(255,255,255,.92);
+ box-shadow:0 14px 36px rgba(37,99,235,.10),inset 0 1px 0 rgba(255,255,255,.95);
+ animation:topbarFloat 6s ease-in-out infinite;
+}
+@keyframes topbarFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+nav{gap:8px;align-items:center}
+.nav-btn{
+ position:relative;isolation:isolate;overflow:hidden;
+ border:1px solid rgba(148,163,184,.16);
+ border-radius:999px;padding:10px 16px;
+ background:rgba(255,255,255,.64);color:#475569;
+ box-shadow:0 4px 12px rgba(15,23,42,.045),inset 0 1px 0 rgba(255,255,255,.95);
+ transition:transform .28s cubic-bezier(.2,.8,.2,1),box-shadow .28s ease,background .28s ease,color .28s ease;
+}
+.nav-btn::before,.btn::before,.file-btn::before{
+ content:"";position:absolute;inset:-60% auto -60% -45%;width:38%;
+ background:linear-gradient(100deg,transparent,rgba(255,255,255,.58),transparent);
+ transform:translateX(-180%) rotate(18deg);transition:transform .65s ease;pointer-events:none;
+}
+.nav-btn::after,.btn::after,.file-btn::after{
+ content:"";position:absolute;width:12px;height:12px;border-radius:50%;
+ left:var(--drop-x,50%);top:var(--drop-y,50%);
+ background:rgba(255,255,255,.55);transform:translate(-50%,-50%) scale(0);
+ opacity:0;pointer-events:none;
+}
+.nav-btn:hover,.btn:hover,.file-btn:hover{transform:translateY(-3px);box-shadow:0 9px 22px rgba(37,99,235,.16)}
+.nav-btn:hover::before,.btn:hover::before,.file-btn:hover::before{transform:translateX(470%) rotate(18deg)}
+.nav-btn.active{
+ color:#fff;background:linear-gradient(135deg,#2563eb,#22b8cf);
+ border-color:rgba(255,255,255,.8);
+ box-shadow:0 7px 20px rgba(37,99,235,.25),inset 0 1px 0 rgba(255,255,255,.45);
+}
+.btn,.file-btn{position:relative;isolation:isolate;overflow:hidden;border-radius:999px}
+.btn.primary{box-shadow:0 5px 16px rgba(37,99,235,.18)}
+.btn:active,.nav-btn:active,.file-btn:active{transform:scale(.96)}
+.btn:active::after,.nav-btn:active::after,.file-btn:active::after{
+ animation:waterDrop .65s ease-out;
+}
+@keyframes waterDrop{
+ 0%{transform:translate(-50%,-50%) scale(0);opacity:.65}
+ 100%{transform:translate(-50%,-50%) scale(16);opacity:0}
+}
+.glass.panel,.glass.card{
+ border-radius:24px;
+ box-shadow:0 10px 28px rgba(15,23,42,.055),inset 0 1px 0 rgba(255,255,255,.95);
+ transition:transform .3s ease,box-shadow .3s ease;
+}
+.glass.panel:hover,.glass.card:hover{box-shadow:0 14px 32px rgba(37,99,235,.09),inset 0 1px 0 rgba(255,255,255,.98)}
+.logo{border-radius:17px;animation:logoBob 4.5s ease-in-out infinite}
+@keyframes logoBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@media(max-width:760px){
+ .topbar{border-radius:24px;margin:10px 10px;padding:13px;gap:12px;animation:none}
+ nav{width:100%;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;padding:5px 2px 9px;scrollbar-width:none}
+ nav::-webkit-scrollbar{display:none}
+ .nav-btn{flex:0 0 auto;padding:9px 14px;font-size:12px}
+}
+@media(prefers-reduced-motion:reduce){
+ *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}
+}
