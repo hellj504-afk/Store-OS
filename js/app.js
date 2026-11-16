@@ -1,1 +1,1 @@
-<full updated app.js with low-stock data, automatic KG<100 / NOS<500 detection, manual add/delete, search filter and PDF download>
+<full restored Store OS logic plus Low Stock calculated from Floor Inventory and Store closing quantities: KG/KGS below 100 or NOS below 500; manual low-stock entries, search filter and PDF export>
