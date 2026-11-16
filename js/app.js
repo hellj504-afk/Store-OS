@@ -8,7 +8,7 @@ function num(value){if(value===null||value===undefined||value==='')return 0;cons
 const money=n=>new Intl.NumberFormat('en-US',{notation:'compact',compactDisplay:'short',maximumFractionDigits:2}).format(Number(n)||0);
 const dashboardMoney=n=>{
  const value=Number(n)||0;
- return String(Number((value/1000000).toFixed(2)))+' Million';
+ return new Intl.NumberFormat('en-US',{maximumFractionDigits:1}).format(value/1000000)+'M';
 };
 const rateOf=code=>{const i=data.slow.find(x=>String(x.code||'').trim()===String(code||'').trim());return i?Number(i.rate)||0:0};
 const toast=m=>{const t=document.getElementById('toast');if(!t)return;t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000)};
@@ -82,7 +82,7 @@ function setupLowStockControls(){
  if(pdf)pdf.addEventListener('click',()=>{if(!currentLowStockRows.length){toast('No rows to export');return}if(!window.jspdf||!window.jspdf.jsPDF){toast('PDF library not loaded. Please check internet and refresh.');return}const doc=new window.jspdf.jsPDF({orientation:'landscape'});doc.setFontSize(16);doc.text('Store OS - Low Stock Items',14,14);doc.setFontSize(9);doc.text('Source: Floor Inventory, Store and manual entries',14,21);doc.autoTable({startY:27,head:[['Source','Item Code','Description','UOM','Closing / Qty','Status']],body:currentLowStockRows.map(r=>[r.sourceLabel,r.code,r.desc,r.uom,String(r.qty),r.status]),styles:{fontSize:8,cellPadding:2,overflow:'linebreak'},headStyles:{fillColor:[35,75,125]},columnStyles:{2:{cellWidth:100}}});doc.save('Store-OS-Low-Stock.pdf')});
 }
 setupLowStockControls();
-const costToggle=document.getElementById('toggleCost');if(costToggle)costToggle.addEventListener('click',()=>{const area=document.getElementById('costArea');if(!area)return;area.hidden=!area.hidden;costToggle.textContent=area.hidden?'Show Cost':'Hide Cost';if(!area.hidden)drawChart()});
+const costToggle=document.getElementById('toggleCost');if(costToggle)costToggle.addEventListener('click',()=>{const area=document.getElementById('costArea');if(!area)return;area.hidden=!area.hidden;costToggle.textContent=area.hidden?'Show Cost':'Hide Cost';});
 function renderBom(){const search=document.getElementById('bomSearch');const cost=document.getElementById('bomCost');if(!search||!cost)return;const q=String(filters.bom||search.value||'').toLowerCase();const rows=data.bom.filter(r=>{const parent=String(r.parent||'').toLowerCase();const child=String(r.child||'').toLowerCase();const desc=String(r.desc||'').toLowerCase();return !q||parent.includes(q)||child.includes(q)||desc.includes(q)});table('bomTable',['Parent / FG','Child Item','Description','Qty','UOM','Rate','Line Cost'],rows.map(r=>{const c=(Number(r.qty)||0)*rateOf(r.child);return[r.parent,r.child,r.desc,r.qty,r.uom,money(rateOf(r.child)),money(c)]}));cost.textContent=money(rows.reduce((s,r)=>s+(Number(r.qty)||0)*rateOf(r.child),0))}
 function drawChart(){
  const c=document.getElementById('chart');if(!c||!c.getContext)return;const x=c.getContext('2d');if(!x)return;
@@ -92,7 +92,7 @@ function drawChart(){
  const labels=[...new Set([...invMap.keys(),...storeMap.keys()])].sort().slice(0,12),inv=labels.map(k=>(invMap.get(k)||0)/1e6),sto=labels.map(k=>(storeMap.get(k)||0)/1e6);
  const w=Math.max(c.clientWidth,320),h=260,dpr=window.devicePixelRatio||1;c.width=w*dpr;c.height=h*dpr;x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,w,h);
  const left=52,right=18,top=24,bottom=55,pw=w-left-right,ph=h-top-bottom,max=Math.max(1,...inv,...sto);x.strokeStyle='#d8dee9';x.lineWidth=1;x.fillStyle='#64748b';x.font='11px Inter, sans-serif';
- for(let i=0;i<=4;i++){const y=top+ph*i/4;x.beginPath();x.moveTo(left,y);x.lineTo(w-right,y);x.stroke();x.fillText((max*(1-i/4)).toFixed(2),6,y+4)}
+ for(let i=0;i<=4;i++){const y=top+ph*i/4;x.beginPath();x.moveTo(left,y);x.lineTo(w-right,y);x.stroke();x.fillText((max*(1-i/4)).toFixed(1)+'M',6,y+4)}
  const draw=(values,color)=>{if(!values.length)return;x.strokeStyle=color;x.lineWidth=2.5;x.beginPath();values.forEach((v,i)=>{const px=left+(labels.length<2?pw/2:pw*i/(labels.length-1)),py=top+ph-(v/max)*ph;i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke();values.forEach((v,i)=>{const px=left+(labels.length<2?pw/2:pw*i/(labels.length-1)),py=top+ph-(v/max)*ph;x.fillStyle=color;x.beginPath();x.arc(px,py,3.5,0,Math.PI*2);x.fill()})};draw(inv,'#2563eb');draw(sto,'#0891b2');
  const step=Math.max(1,Math.ceil(labels.length/6));labels.forEach((label,i)=>{if(i%step===0){const px=left+(labels.length<2?pw/2:pw*i/(labels.length-1));x.save();x.translate(px,h-8);x.rotate(-.35);x.fillStyle='#64748b';x.font='10px Inter, sans-serif';x.fillText(label.slice(0,14),0,0);x.restore()}});
  x.fillStyle='#2563eb';x.fillRect(left,7,10,3);x.fillStyle='#475569';x.fillText('Inventory',left+15,12);x.fillStyle='#0891b2';x.fillRect(left+95,7,10,3);x.fillStyle='#475569';x.fillText('Store',left+110,12);
