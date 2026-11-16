@@ -130,3 +130,53 @@ nav{gap:8px;align-items:center}
 .topbar .nav-btn.active::before{background:linear-gradient(180deg,rgba(255,255,255,.72),rgba(255,255,255,0));opacity:.9}
 @media(max-width:760px){.topbar nav{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;width:100%;border-radius:28px;padding:7px;scrollbar-width:none}.topbar nav::-webkit-scrollbar{display:none}.topbar .nav-btn{padding:10px 16px}}
 @media(prefers-reduced-motion:reduce){.topbar .nav-btn{transition:none}}
+
+
+/* WhatsApp-Beta-inspired bottom floating navigation + soft neon pulse */
+@media(min-width:0px){
+  body{padding-bottom:105px}
+  .topbar{padding-bottom:14px}
+  .topbar nav{
+    position:fixed;left:50%;right:auto;bottom:max(14px,env(safe-area-inset-bottom));
+    transform:translateX(-50%);z-index:1000;
+    width:max-content;max-width:calc(100vw - 24px);
+    flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;
+    padding:8px;gap:6px;border-radius:999px;
+    background:rgba(235,248,255,.68);
+    border:1px solid rgba(255,255,255,.9);
+    -webkit-backdrop-filter:blur(26px) saturate(190%);
+    backdrop-filter:blur(26px) saturate(190%);
+    box-shadow:0 10px 34px rgba(15,75,110,.16),inset 0 1px 2px rgba(255,255,255,.95);
+    scrollbar-width:none;
+  }
+  .topbar nav::-webkit-scrollbar{display:none}
+  .topbar .nav-btn{
+    flex:0 0 auto;white-space:nowrap;
+    animation:navNeonBreath 3.8s ease-in-out infinite;
+  }
+  .topbar .nav-btn:nth-child(2n){animation-delay:.8s}
+  .topbar .nav-btn:nth-child(3n){animation-delay:1.5s}
+  .topbar .nav-btn.active{
+    color:#244c61;
+    background:rgba(255,255,255,.72);
+    border-color:rgba(255,255,255,.98);
+    box-shadow:0 0 7px rgba(34,211,238,.35),0 0 17px rgba(56,189,248,.22),inset 0 1px 2px #fff;
+  }
+}
+@keyframes navNeonBreath{
+  0%,100%{box-shadow:0 3px 10px rgba(14,116,144,.07),inset 0 1px 1px rgba(255,255,255,.85)}
+  50%{box-shadow:0 0 7px rgba(34,211,238,.28),0 0 15px rgba(56,189,248,.18),inset 0 1px 2px rgba(255,255,255,.98)}
+}
+.btn,.file-btn{
+  animation:buttonNeonPulse 3.4s ease-in-out infinite;
+}
+.btn:hover,.file-btn:hover{
+  box-shadow:0 0 8px rgba(34,211,238,.45),0 0 19px rgba(59,130,246,.28),0 8px 22px rgba(37,99,235,.12);
+}
+@keyframes buttonNeonPulse{
+  0%,100%{box-shadow:0 4px 12px rgba(37,99,235,.10)}
+  50%{box-shadow:0 0 7px rgba(34,211,238,.24),0 0 16px rgba(59,130,246,.16)}
+}
+@media(prefers-reduced-motion:reduce){
+  .topbar .nav-btn,.btn,.file-btn{animation:none!important}
+}
