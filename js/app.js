@@ -4,6 +4,7 @@ let data=JSON.parse(localStorage.getItem('storeOS')||'{}');KEYS.forEach(k=>data[
 let firebaseApi=null,saving=false;const filters={inventory:'',store:'',voucher:'',ir:'',bom:'',slow:'',lowStockManual:''};
 let lowStockSearchText='',lowStockFilter='all',currentLowStockRows=[];
 if(typeof pdfjsLib!=='undefined'){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'}
+function num(value){if(value===null||value===undefined||value==='')return 0;const parsed=Number(String(value).replace(/,/g,'').replace(/[^0-9.+-]/g,''));return Number.isFinite(parsed)?parsed:0}
 const money=n=>new Intl.NumberFormat('en-US',{notation:'compact',compactDisplay:'short',maximumFractionDigits:2}).format(Number(n)||0);
 const dashboardMoney=n=>{
  const value=Number(n)||0;
